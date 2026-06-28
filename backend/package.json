@@ -1,0 +1,19 @@
+{
+  "name": "automated-trading-system",
+  "version": "1.0.0",
+  "description": "Fully automated trading system with dynamic strategy adaptation and dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node test_bot.js",
+    "lint": "node -c *.js ../scratch/*.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "node-telegram-bot-api": "^0.65.1",
+    "pg": "^8.21.0",
+    "ws": "^8.16.0"
+  }
+}

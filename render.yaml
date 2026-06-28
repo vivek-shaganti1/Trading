@@ -2,6 +2,7 @@ services:
   - type: web
     name: agy-trader-backend
     env: node
+    rootDir: backend
     buildCommand: npm install
     startCommand: npm start
     envVars:

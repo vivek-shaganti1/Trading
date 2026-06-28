@@ -1,4 +1,19 @@
-require('dotenv').config();
+const path = require('path');
+const fs = require('fs');
+
+const envPathLocal = path.join(process.cwd(), '.env');
+const envPathParent = path.join(process.cwd(), '..', '.env');
+const envPathConfigDir = path.join(__dirname, '..', '.env');
+
+if (fs.existsSync(envPathLocal)) {
+  require('dotenv').config({ path: envPathLocal });
+} else if (fs.existsSync(envPathParent)) {
+  require('dotenv').config({ path: envPathParent });
+} else if (fs.existsSync(envPathConfigDir)) {
+  require('dotenv').config({ path: envPathConfigDir });
+} else {
+  require('dotenv').config();
+}
 
 module.exports = {
   PORT: process.env.PORT || 3000,
