@@ -1,0 +1,2507 @@
+[
+  {
+    "symbol": "3MINDIA",
+    "sector": "SERVICES",
+    "yahoo": "3MINDIA.NS"
+  },
+  {
+    "symbol": "ABB",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "ABB.NS"
+  },
+  {
+    "symbol": "ACC",
+    "sector": "CEMENT & CEMENT PRODUCTS",
+    "yahoo": "ACC.NS"
+  },
+  {
+    "symbol": "AIAENG",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "AIAENG.NS"
+  },
+  {
+    "symbol": "APLAPOLLO",
+    "sector": "METALS",
+    "yahoo": "APLAPOLLO.NS"
+  },
+  {
+    "symbol": "AUBANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "AUBANK.NS"
+  },
+  {
+    "symbol": "AAVAS",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "AAVAS.NS"
+  },
+  {
+    "symbol": "ADANIGREEN",
+    "sector": "ENERGY",
+    "yahoo": "ADANIGREEN.NS"
+  },
+  {
+    "symbol": "ADANIPORTS",
+    "sector": "SERVICES",
+    "yahoo": "ADANIPORTS.NS"
+  },
+  {
+    "symbol": "ADANIPOWER",
+    "sector": "ENERGY",
+    "yahoo": "ADANIPOWER.NS"
+  },
+  {
+    "symbol": "ADANITRANS",
+    "sector": "ENERGY",
+    "yahoo": "ADANITRANS.NS"
+  },
+  {
+    "symbol": "ABCAPITAL",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "ABCAPITAL.NS"
+  },
+  {
+    "symbol": "ABFRL",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "ABFRL.NS"
+  },
+  {
+    "symbol": "ADVENZYMES",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "ADVENZYMES.NS"
+  },
+  {
+    "symbol": "AEGISCHEM",
+    "sector": "ENERGY",
+    "yahoo": "AEGISCHEM.NS"
+  },
+  {
+    "symbol": "AJANTPHARM",
+    "sector": "PHARMA",
+    "yahoo": "AJANTPHARM.NS"
+  },
+  {
+    "symbol": "AKZOINDIA",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "AKZOINDIA.NS"
+  },
+  {
+    "symbol": "APLLTD",
+    "sector": "PHARMA",
+    "yahoo": "APLLTD.NS"
+  },
+  {
+    "symbol": "ALKEM",
+    "sector": "PHARMA",
+    "yahoo": "ALKEM.NS"
+  },
+  {
+    "symbol": "ALBK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "ALBK.NS"
+  },
+  {
+    "symbol": "ALLCARGO",
+    "sector": "SERVICES",
+    "yahoo": "ALLCARGO.NS"
+  },
+  {
+    "symbol": "AMARAJABAT",
+    "sector": "AUTOMOBILE",
+    "yahoo": "AMARAJABAT.NS"
+  },
+  {
+    "symbol": "AMBUJACEM",
+    "sector": "CEMENT & CEMENT PRODUCTS",
+    "yahoo": "AMBUJACEM.NS"
+  },
+  {
+    "symbol": "ANDHRABANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "ANDHRABANK.NS"
+  },
+  {
+    "symbol": "APOLLOHOSP",
+    "sector": "HEALTHCARE SERVICES",
+    "yahoo": "APOLLOHOSP.NS"
+  },
+  {
+    "symbol": "APOLLOTYRE",
+    "sector": "AUTOMOBILE",
+    "yahoo": "APOLLOTYRE.NS"
+  },
+  {
+    "symbol": "ASHOKLEY",
+    "sector": "AUTOMOBILE",
+    "yahoo": "ASHOKLEY.NS"
+  },
+  {
+    "symbol": "ASHOKA",
+    "sector": "CONSTRUCTION",
+    "yahoo": "ASHOKA.NS"
+  },
+  {
+    "symbol": "ASIANPAINT",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "ASIANPAINT.NS"
+  },
+  {
+    "symbol": "ASTERDM",
+    "sector": "HEALTHCARE SERVICES",
+    "yahoo": "ASTERDM.NS"
+  },
+  {
+    "symbol": "ASTRAZEN",
+    "sector": "PHARMA",
+    "yahoo": "ASTRAZEN.NS"
+  },
+  {
+    "symbol": "ASTRAL",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "ASTRAL.NS"
+  },
+  {
+    "symbol": "ATUL",
+    "sector": "CHEMICALS",
+    "yahoo": "ATUL.NS"
+  },
+  {
+    "symbol": "AUROPHARMA",
+    "sector": "PHARMA",
+    "yahoo": "AUROPHARMA.NS"
+  },
+  {
+    "symbol": "AVANTIFEED",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "AVANTIFEED.NS"
+  },
+  {
+    "symbol": "DMART",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "DMART.NS"
+  },
+  {
+    "symbol": "AXISBANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "AXISBANK.NS"
+  },
+  {
+    "symbol": "BASF",
+    "sector": "CHEMICALS",
+    "yahoo": "BASF.NS"
+  },
+  {
+    "symbol": "BEML",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "BEML.NS"
+  },
+  {
+    "symbol": "BSE",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "BSE.NS"
+  },
+  {
+    "symbol": "BAJAJ-AUTO",
+    "sector": "AUTOMOBILE",
+    "yahoo": "BAJAJ-AUTO.NS"
+  },
+  {
+    "symbol": "BAJAJCON",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "BAJAJCON.NS"
+  },
+  {
+    "symbol": "BAJAJELEC",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "BAJAJELEC.NS"
+  },
+  {
+    "symbol": "BAJFINANCE",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "BAJFINANCE.NS"
+  },
+  {
+    "symbol": "BAJAJFINSV",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "BAJAJFINSV.NS"
+  },
+  {
+    "symbol": "BAJAJHLDNG",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "BAJAJHLDNG.NS"
+  },
+  {
+    "symbol": "BALKRISIND",
+    "sector": "AUTOMOBILE",
+    "yahoo": "BALKRISIND.NS"
+  },
+  {
+    "symbol": "BALMLAWRIE",
+    "sector": "SERVICES",
+    "yahoo": "BALMLAWRIE.NS"
+  },
+  {
+    "symbol": "BALRAMCHIN",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "BALRAMCHIN.NS"
+  },
+  {
+    "symbol": "BANDHANBNK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "BANDHANBNK.NS"
+  },
+  {
+    "symbol": "BANKBARODA",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "BANKBARODA.NS"
+  },
+  {
+    "symbol": "BANKINDIA",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "BANKINDIA.NS"
+  },
+  {
+    "symbol": "MAHABANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "MAHABANK.NS"
+  },
+  {
+    "symbol": "BATAINDIA",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "BATAINDIA.NS"
+  },
+  {
+    "symbol": "BERGEPAINT",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "BERGEPAINT.NS"
+  },
+  {
+    "symbol": "BDL",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "BDL.NS"
+  },
+  {
+    "symbol": "BEL",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "BEL.NS"
+  },
+  {
+    "symbol": "BHARATFORG",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "BHARATFORG.NS"
+  },
+  {
+    "symbol": "BHEL",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "BHEL.NS"
+  },
+  {
+    "symbol": "BPCL",
+    "sector": "ENERGY",
+    "yahoo": "BPCL.NS"
+  },
+  {
+    "symbol": "BHARTIARTL",
+    "sector": "TELECOM",
+    "yahoo": "BHARTIARTL.NS"
+  },
+  {
+    "symbol": "INFRATEL",
+    "sector": "TELECOM",
+    "yahoo": "INFRATEL.NS"
+  },
+  {
+    "symbol": "BIOCON",
+    "sector": "PHARMA",
+    "yahoo": "BIOCON.NS"
+  },
+  {
+    "symbol": "BIRLACORPN",
+    "sector": "CEMENT & CEMENT PRODUCTS",
+    "yahoo": "BIRLACORPN.NS"
+  },
+  {
+    "symbol": "BLISSGVS",
+    "sector": "PHARMA",
+    "yahoo": "BLISSGVS.NS"
+  },
+  {
+    "symbol": "BLUEDART",
+    "sector": "SERVICES",
+    "yahoo": "BLUEDART.NS"
+  },
+  {
+    "symbol": "BLUESTARCO",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "BLUESTARCO.NS"
+  },
+  {
+    "symbol": "BBTC",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "BBTC.NS"
+  },
+  {
+    "symbol": "BOMDYEING",
+    "sector": "TEXTILES",
+    "yahoo": "BOMDYEING.NS"
+  },
+  {
+    "symbol": "BOSCHLTD",
+    "sector": "AUTOMOBILE",
+    "yahoo": "BOSCHLTD.NS"
+  },
+  {
+    "symbol": "BRIGADE",
+    "sector": "CONSTRUCTION",
+    "yahoo": "BRIGADE.NS"
+  },
+  {
+    "symbol": "BRITANNIA",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "BRITANNIA.NS"
+  },
+  {
+    "symbol": "CARERATING",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "CARERATING.NS"
+  },
+  {
+    "symbol": "CCL",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "CCL.NS"
+  },
+  {
+    "symbol": "CESC",
+    "sector": "ENERGY",
+    "yahoo": "CESC.NS"
+  },
+  {
+    "symbol": "CGPOWER",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "CGPOWER.NS"
+  },
+  {
+    "symbol": "CRISIL",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "CRISIL.NS"
+  },
+  {
+    "symbol": "CADILAHC",
+    "sector": "PHARMA",
+    "yahoo": "CADILAHC.NS"
+  },
+  {
+    "symbol": "CANFINHOME",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "CANFINHOME.NS"
+  },
+  {
+    "symbol": "CANBK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "CANBK.NS"
+  },
+  {
+    "symbol": "CAPLIPOINT",
+    "sector": "PHARMA",
+    "yahoo": "CAPLIPOINT.NS"
+  },
+  {
+    "symbol": "CARBORUNIV",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "CARBORUNIV.NS"
+  },
+  {
+    "symbol": "CASTROLIND",
+    "sector": "ENERGY",
+    "yahoo": "CASTROLIND.NS"
+  },
+  {
+    "symbol": "CEATLTD",
+    "sector": "AUTOMOBILE",
+    "yahoo": "CEATLTD.NS"
+  },
+  {
+    "symbol": "CENTRALBK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "CENTRALBK.NS"
+  },
+  {
+    "symbol": "CDSL",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "CDSL.NS"
+  },
+  {
+    "symbol": "CENTURYPLY",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "CENTURYPLY.NS"
+  },
+  {
+    "symbol": "CERA",
+    "sector": "CONSTRUCTION",
+    "yahoo": "CERA.NS"
+  },
+  {
+    "symbol": "CHAMBLFERT",
+    "sector": "FERTILISERS & PESTICIDES",
+    "yahoo": "CHAMBLFERT.NS"
+  },
+  {
+    "symbol": "CHENNPETRO",
+    "sector": "ENERGY",
+    "yahoo": "CHENNPETRO.NS"
+  },
+  {
+    "symbol": "CHOLAHLDNG",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "CHOLAHLDNG.NS"
+  },
+  {
+    "symbol": "CHOLAFIN",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "CHOLAFIN.NS"
+  },
+  {
+    "symbol": "CIPLA",
+    "sector": "PHARMA",
+    "yahoo": "CIPLA.NS"
+  },
+  {
+    "symbol": "CUB",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "CUB.NS"
+  },
+  {
+    "symbol": "COALINDIA",
+    "sector": "METALS",
+    "yahoo": "COALINDIA.NS"
+  },
+  {
+    "symbol": "COCHINSHIP",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "COCHINSHIP.NS"
+  },
+  {
+    "symbol": "COFFEEDAY",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "COFFEEDAY.NS"
+  },
+  {
+    "symbol": "COLPAL",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "COLPAL.NS"
+  },
+  {
+    "symbol": "CONCOR",
+    "sector": "SERVICES",
+    "yahoo": "CONCOR.NS"
+  },
+  {
+    "symbol": "COROMANDEL",
+    "sector": "FERTILISERS & PESTICIDES",
+    "yahoo": "COROMANDEL.NS"
+  },
+  {
+    "symbol": "CORPBANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "CORPBANK.NS"
+  },
+  {
+    "symbol": "COX&KINGS",
+    "sector": "SERVICES",
+    "yahoo": "COX&KINGS.NS"
+  },
+  {
+    "symbol": "CREDITACC",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "CREDITACC.NS"
+  },
+  {
+    "symbol": "CROMPTON",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "CROMPTON.NS"
+  },
+  {
+    "symbol": "CUMMINSIND",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "CUMMINSIND.NS"
+  },
+  {
+    "symbol": "CYIENT",
+    "sector": "IT",
+    "yahoo": "CYIENT.NS"
+  },
+  {
+    "symbol": "DBCORP",
+    "sector": "MEDIA & ENTERTAINMENT",
+    "yahoo": "DBCORP.NS"
+  },
+  {
+    "symbol": "DCBBANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "DCBBANK.NS"
+  },
+  {
+    "symbol": "DCMSHRIRAM",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "DCMSHRIRAM.NS"
+  },
+  {
+    "symbol": "DLF",
+    "sector": "CONSTRUCTION",
+    "yahoo": "DLF.NS"
+  },
+  {
+    "symbol": "DABUR",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "DABUR.NS"
+  },
+  {
+    "symbol": "DEEPAKFERT",
+    "sector": "CHEMICALS",
+    "yahoo": "DEEPAKFERT.NS"
+  },
+  {
+    "symbol": "DEEPAKNTR",
+    "sector": "CHEMICALS",
+    "yahoo": "DEEPAKNTR.NS"
+  },
+  {
+    "symbol": "DELTACORP",
+    "sector": "SERVICES",
+    "yahoo": "DELTACORP.NS"
+  },
+  {
+    "symbol": "DHFL",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "DHFL.NS"
+  },
+  {
+    "symbol": "DBL",
+    "sector": "CONSTRUCTION",
+    "yahoo": "DBL.NS"
+  },
+  {
+    "symbol": "DISHTV",
+    "sector": "MEDIA & ENTERTAINMENT",
+    "yahoo": "DISHTV.NS"
+  },
+  {
+    "symbol": "DCAL",
+    "sector": "PHARMA",
+    "yahoo": "DCAL.NS"
+  },
+  {
+    "symbol": "DIVISLAB",
+    "sector": "PHARMA",
+    "yahoo": "DIVISLAB.NS"
+  },
+  {
+    "symbol": "DIXON",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "DIXON.NS"
+  },
+  {
+    "symbol": "LALPATHLAB",
+    "sector": "HEALTHCARE SERVICES",
+    "yahoo": "LALPATHLAB.NS"
+  },
+  {
+    "symbol": "DRREDDY",
+    "sector": "PHARMA",
+    "yahoo": "DRREDDY.NS"
+  },
+  {
+    "symbol": "EIDPARRY",
+    "sector": "FERTILISERS & PESTICIDES",
+    "yahoo": "EIDPARRY.NS"
+  },
+  {
+    "symbol": "EIHOTEL",
+    "sector": "SERVICES",
+    "yahoo": "EIHOTEL.NS"
+  },
+  {
+    "symbol": "EDELWEISS",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "EDELWEISS.NS"
+  },
+  {
+    "symbol": "EICHERMOT",
+    "sector": "AUTOMOBILE",
+    "yahoo": "EICHERMOT.NS"
+  },
+  {
+    "symbol": "ELGIEQUIP",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "ELGIEQUIP.NS"
+  },
+  {
+    "symbol": "EMAMILTD",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "EMAMILTD.NS"
+  },
+  {
+    "symbol": "ENDURANCE",
+    "sector": "AUTOMOBILE",
+    "yahoo": "ENDURANCE.NS"
+  },
+  {
+    "symbol": "ENGINERSIN",
+    "sector": "CONSTRUCTION",
+    "yahoo": "ENGINERSIN.NS"
+  },
+  {
+    "symbol": "EQUITAS",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "EQUITAS.NS"
+  },
+  {
+    "symbol": "ERIS",
+    "sector": "PHARMA",
+    "yahoo": "ERIS.NS"
+  },
+  {
+    "symbol": "ESCORTS",
+    "sector": "AUTOMOBILE",
+    "yahoo": "ESCORTS.NS"
+  },
+  {
+    "symbol": "ESSELPACK",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "ESSELPACK.NS"
+  },
+  {
+    "symbol": "EXIDEIND",
+    "sector": "AUTOMOBILE",
+    "yahoo": "EXIDEIND.NS"
+  },
+  {
+    "symbol": "FDC",
+    "sector": "PHARMA",
+    "yahoo": "FDC.NS"
+  },
+  {
+    "symbol": "FEDERALBNK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "FEDERALBNK.NS"
+  },
+  {
+    "symbol": "FINEORG",
+    "sector": "CHEMICALS",
+    "yahoo": "FINEORG.NS"
+  },
+  {
+    "symbol": "FINCABLES",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "FINCABLES.NS"
+  },
+  {
+    "symbol": "FINPIPE",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "FINPIPE.NS"
+  },
+  {
+    "symbol": "FSL",
+    "sector": "IT",
+    "yahoo": "FSL.NS"
+  },
+  {
+    "symbol": "FORTIS",
+    "sector": "HEALTHCARE SERVICES",
+    "yahoo": "FORTIS.NS"
+  },
+  {
+    "symbol": "FCONSUMER",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "FCONSUMER.NS"
+  },
+  {
+    "symbol": "FLFL",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "FLFL.NS"
+  },
+  {
+    "symbol": "FRETAIL",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "FRETAIL.NS"
+  },
+  {
+    "symbol": "GAIL",
+    "sector": "ENERGY",
+    "yahoo": "GAIL.NS"
+  },
+  {
+    "symbol": "GEPIL",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "GEPIL.NS"
+  },
+  {
+    "symbol": "GET&D",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "GET&D.NS"
+  },
+  {
+    "symbol": "GHCL",
+    "sector": "CHEMICALS",
+    "yahoo": "GHCL.NS"
+  },
+  {
+    "symbol": "GMRINFRA",
+    "sector": "CONSTRUCTION",
+    "yahoo": "GMRINFRA.NS"
+  },
+  {
+    "symbol": "GALAXYSURF",
+    "sector": "CHEMICALS",
+    "yahoo": "GALAXYSURF.NS"
+  },
+  {
+    "symbol": "GDL",
+    "sector": "SERVICES",
+    "yahoo": "GDL.NS"
+  },
+  {
+    "symbol": "GAYAPROJ",
+    "sector": "CONSTRUCTION",
+    "yahoo": "GAYAPROJ.NS"
+  },
+  {
+    "symbol": "GICRE",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "GICRE.NS"
+  },
+  {
+    "symbol": "GILLETTE",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "GILLETTE.NS"
+  },
+  {
+    "symbol": "GSKCONS",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "GSKCONS.NS"
+  },
+  {
+    "symbol": "GLAXO",
+    "sector": "PHARMA",
+    "yahoo": "GLAXO.NS"
+  },
+  {
+    "symbol": "GLENMARK",
+    "sector": "PHARMA",
+    "yahoo": "GLENMARK.NS"
+  },
+  {
+    "symbol": "GODFRYPHLP",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "GODFRYPHLP.NS"
+  },
+  {
+    "symbol": "GODREJAGRO",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "GODREJAGRO.NS"
+  },
+  {
+    "symbol": "GODREJCP",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "GODREJCP.NS"
+  },
+  {
+    "symbol": "GODREJIND",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "GODREJIND.NS"
+  },
+  {
+    "symbol": "GODREJPROP",
+    "sector": "CONSTRUCTION",
+    "yahoo": "GODREJPROP.NS"
+  },
+  {
+    "symbol": "GRANULES",
+    "sector": "PHARMA",
+    "yahoo": "GRANULES.NS"
+  },
+  {
+    "symbol": "GRAPHITE",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "GRAPHITE.NS"
+  },
+  {
+    "symbol": "GRASIM",
+    "sector": "CEMENT & CEMENT PRODUCTS",
+    "yahoo": "GRASIM.NS"
+  },
+  {
+    "symbol": "GESHIP",
+    "sector": "SERVICES",
+    "yahoo": "GESHIP.NS"
+  },
+  {
+    "symbol": "GREAVESCOT",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "GREAVESCOT.NS"
+  },
+  {
+    "symbol": "GRINDWELL",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "GRINDWELL.NS"
+  },
+  {
+    "symbol": "GRUH",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "GRUH.NS"
+  },
+  {
+    "symbol": "GUJALKALI",
+    "sector": "CHEMICALS",
+    "yahoo": "GUJALKALI.NS"
+  },
+  {
+    "symbol": "GUJFLUORO",
+    "sector": "CHEMICALS",
+    "yahoo": "GUJFLUORO.NS"
+  },
+  {
+    "symbol": "GUJGASLTD",
+    "sector": "ENERGY",
+    "yahoo": "GUJGASLTD.NS"
+  },
+  {
+    "symbol": "GMDCLTD",
+    "sector": "METALS",
+    "yahoo": "GMDCLTD.NS"
+  },
+  {
+    "symbol": "GNFC",
+    "sector": "CHEMICALS",
+    "yahoo": "GNFC.NS"
+  },
+  {
+    "symbol": "GPPL",
+    "sector": "SERVICES",
+    "yahoo": "GPPL.NS"
+  },
+  {
+    "symbol": "GSFC",
+    "sector": "FERTILISERS & PESTICIDES",
+    "yahoo": "GSFC.NS"
+  },
+  {
+    "symbol": "GSPL",
+    "sector": "ENERGY",
+    "yahoo": "GSPL.NS"
+  },
+  {
+    "symbol": "GULFOILLUB",
+    "sector": "ENERGY",
+    "yahoo": "GULFOILLUB.NS"
+  },
+  {
+    "symbol": "HEG",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "HEG.NS"
+  },
+  {
+    "symbol": "HCLTECH",
+    "sector": "IT",
+    "yahoo": "HCLTECH.NS"
+  },
+  {
+    "symbol": "HDFCAMC",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "HDFCAMC.NS"
+  },
+  {
+    "symbol": "HDFCBANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "HDFCBANK.NS"
+  },
+  {
+    "symbol": "HDFCLIFE",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "HDFCLIFE.NS"
+  },
+  {
+    "symbol": "HATHWAY",
+    "sector": "MEDIA & ENTERTAINMENT",
+    "yahoo": "HATHWAY.NS"
+  },
+  {
+    "symbol": "HATSUN",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "HATSUN.NS"
+  },
+  {
+    "symbol": "HAVELLS",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "HAVELLS.NS"
+  },
+  {
+    "symbol": "HEIDELBERG",
+    "sector": "CEMENT & CEMENT PRODUCTS",
+    "yahoo": "HEIDELBERG.NS"
+  },
+  {
+    "symbol": "HERITGFOOD",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "HERITGFOOD.NS"
+  },
+  {
+    "symbol": "HEROMOTOCO",
+    "sector": "AUTOMOBILE",
+    "yahoo": "HEROMOTOCO.NS"
+  },
+  {
+    "symbol": "HEXAWARE",
+    "sector": "IT",
+    "yahoo": "HEXAWARE.NS"
+  },
+  {
+    "symbol": "HFCL",
+    "sector": "TELECOM",
+    "yahoo": "HFCL.NS"
+  },
+  {
+    "symbol": "HSCL",
+    "sector": "CHEMICALS",
+    "yahoo": "HSCL.NS"
+  },
+  {
+    "symbol": "HIMATSEIDE",
+    "sector": "TEXTILES",
+    "yahoo": "HIMATSEIDE.NS"
+  },
+  {
+    "symbol": "HINDALCO",
+    "sector": "METALS",
+    "yahoo": "HINDALCO.NS"
+  },
+  {
+    "symbol": "HAL",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "HAL.NS"
+  },
+  {
+    "symbol": "HINDCOPPER",
+    "sector": "METALS",
+    "yahoo": "HINDCOPPER.NS"
+  },
+  {
+    "symbol": "HINDPETRO",
+    "sector": "ENERGY",
+    "yahoo": "HINDPETRO.NS"
+  },
+  {
+    "symbol": "HINDUNILVR",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "HINDUNILVR.NS"
+  },
+  {
+    "symbol": "HINDZINC",
+    "sector": "METALS",
+    "yahoo": "HINDZINC.NS"
+  },
+  {
+    "symbol": "HONAUT",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "HONAUT.NS"
+  },
+  {
+    "symbol": "HUDCO",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "HUDCO.NS"
+  },
+  {
+    "symbol": "HDFC",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "HDFC.NS"
+  },
+  {
+    "symbol": "ICICIBANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "ICICIBANK.NS"
+  },
+  {
+    "symbol": "ICICIGI",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "ICICIGI.NS"
+  },
+  {
+    "symbol": "ICICIPRULI",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "ICICIPRULI.NS"
+  },
+  {
+    "symbol": "ISEC",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "ISEC.NS"
+  },
+  {
+    "symbol": "ICRA",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "ICRA.NS"
+  },
+  {
+    "symbol": "IDBI",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "IDBI.NS"
+  },
+  {
+    "symbol": "IDFCFIRSTB",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "IDFCFIRSTB.NS"
+  },
+  {
+    "symbol": "IDFC",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "IDFC.NS"
+  },
+  {
+    "symbol": "IFBIND",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "IFBIND.NS"
+  },
+  {
+    "symbol": "IFCI",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "IFCI.NS"
+  },
+  {
+    "symbol": "IRB",
+    "sector": "CONSTRUCTION",
+    "yahoo": "IRB.NS"
+  },
+  {
+    "symbol": "IRCON",
+    "sector": "CONSTRUCTION",
+    "yahoo": "IRCON.NS"
+  },
+  {
+    "symbol": "ITC",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "ITC.NS"
+  },
+  {
+    "symbol": "ITDCEM",
+    "sector": "CONSTRUCTION",
+    "yahoo": "ITDCEM.NS"
+  },
+  {
+    "symbol": "ITI",
+    "sector": "TELECOM",
+    "yahoo": "ITI.NS"
+  },
+  {
+    "symbol": "INDIACEM",
+    "sector": "CEMENT & CEMENT PRODUCTS",
+    "yahoo": "INDIACEM.NS"
+  },
+  {
+    "symbol": "ITDC",
+    "sector": "SERVICES",
+    "yahoo": "ITDC.NS"
+  },
+  {
+    "symbol": "IBULHSGFIN",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "IBULHSGFIN.NS"
+  },
+  {
+    "symbol": "IBULISL",
+    "sector": "IT",
+    "yahoo": "IBULISL.NS"
+  },
+  {
+    "symbol": "IBREALEST",
+    "sector": "CONSTRUCTION",
+    "yahoo": "IBREALEST.NS"
+  },
+  {
+    "symbol": "IBVENTURES",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "IBVENTURES.NS"
+  },
+  {
+    "symbol": "INDIANB",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "INDIANB.NS"
+  },
+  {
+    "symbol": "IEX",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "IEX.NS"
+  },
+  {
+    "symbol": "INDHOTEL",
+    "sector": "SERVICES",
+    "yahoo": "INDHOTEL.NS"
+  },
+  {
+    "symbol": "IOC",
+    "sector": "ENERGY",
+    "yahoo": "IOC.NS"
+  },
+  {
+    "symbol": "IOB",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "IOB.NS"
+  },
+  {
+    "symbol": "INDOSTAR",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "INDOSTAR.NS"
+  },
+  {
+    "symbol": "INDOCO",
+    "sector": "PHARMA",
+    "yahoo": "INDOCO.NS"
+  },
+  {
+    "symbol": "IGL",
+    "sector": "ENERGY",
+    "yahoo": "IGL.NS"
+  },
+  {
+    "symbol": "INDUSINDBK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "INDUSINDBK.NS"
+  },
+  {
+    "symbol": "INFIBEAM",
+    "sector": "IT",
+    "yahoo": "INFIBEAM.NS"
+  },
+  {
+    "symbol": "NAUKRI",
+    "sector": "IT",
+    "yahoo": "NAUKRI.NS"
+  },
+  {
+    "symbol": "INFY",
+    "sector": "IT",
+    "yahoo": "INFY.NS"
+  },
+  {
+    "symbol": "INOXLEISUR",
+    "sector": "MEDIA & ENTERTAINMENT",
+    "yahoo": "INOXLEISUR.NS"
+  },
+  {
+    "symbol": "INOXWIND",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "INOXWIND.NS"
+  },
+  {
+    "symbol": "INTELLECT",
+    "sector": "IT",
+    "yahoo": "INTELLECT.NS"
+  },
+  {
+    "symbol": "INDIGO",
+    "sector": "SERVICES",
+    "yahoo": "INDIGO.NS"
+  },
+  {
+    "symbol": "IPCALAB",
+    "sector": "PHARMA",
+    "yahoo": "IPCALAB.NS"
+  },
+  {
+    "symbol": "JBCHEPHARM",
+    "sector": "PHARMA",
+    "yahoo": "JBCHEPHARM.NS"
+  },
+  {
+    "symbol": "JKCEMENT",
+    "sector": "CEMENT & CEMENT PRODUCTS",
+    "yahoo": "JKCEMENT.NS"
+  },
+  {
+    "symbol": "JKLAKSHMI",
+    "sector": "CEMENT & CEMENT PRODUCTS",
+    "yahoo": "JKLAKSHMI.NS"
+  },
+  {
+    "symbol": "JKPAPER",
+    "sector": "PAPER",
+    "yahoo": "JKPAPER.NS"
+  },
+  {
+    "symbol": "JKTYRE",
+    "sector": "AUTOMOBILE",
+    "yahoo": "JKTYRE.NS"
+  },
+  {
+    "symbol": "JMFINANCIL",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "JMFINANCIL.NS"
+  },
+  {
+    "symbol": "JSWENERGY",
+    "sector": "ENERGY",
+    "yahoo": "JSWENERGY.NS"
+  },
+  {
+    "symbol": "JSWSTEEL",
+    "sector": "METALS",
+    "yahoo": "JSWSTEEL.NS"
+  },
+  {
+    "symbol": "JAGRAN",
+    "sector": "MEDIA & ENTERTAINMENT",
+    "yahoo": "JAGRAN.NS"
+  },
+  {
+    "symbol": "JAICORPLTD",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "JAICORPLTD.NS"
+  },
+  {
+    "symbol": "JISLJALEQS",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "JISLJALEQS.NS"
+  },
+  {
+    "symbol": "JPASSOCIAT",
+    "sector": "CEMENT & CEMENT PRODUCTS",
+    "yahoo": "JPASSOCIAT.NS"
+  },
+  {
+    "symbol": "J&KBANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "J&KBANK.NS"
+  },
+  {
+    "symbol": "JAMNAAUTO",
+    "sector": "AUTOMOBILE",
+    "yahoo": "JAMNAAUTO.NS"
+  },
+  {
+    "symbol": "JETAIRWAYS",
+    "sector": "SERVICES",
+    "yahoo": "JETAIRWAYS.NS"
+  },
+  {
+    "symbol": "JINDALSAW",
+    "sector": "METALS",
+    "yahoo": "JINDALSAW.NS"
+  },
+  {
+    "symbol": "JSLHISAR",
+    "sector": "METALS",
+    "yahoo": "JSLHISAR.NS"
+  },
+  {
+    "symbol": "JSL",
+    "sector": "METALS",
+    "yahoo": "JSL.NS"
+  },
+  {
+    "symbol": "JINDALSTEL",
+    "sector": "METALS",
+    "yahoo": "JINDALSTEL.NS"
+  },
+  {
+    "symbol": "JUBLFOOD",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "JUBLFOOD.NS"
+  },
+  {
+    "symbol": "JUBILANT",
+    "sector": "PHARMA",
+    "yahoo": "JUBILANT.NS"
+  },
+  {
+    "symbol": "JUSTDIAL",
+    "sector": "IT",
+    "yahoo": "JUSTDIAL.NS"
+  },
+  {
+    "symbol": "JYOTHYLAB",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "JYOTHYLAB.NS"
+  },
+  {
+    "symbol": "KPRMILL",
+    "sector": "TEXTILES",
+    "yahoo": "KPRMILL.NS"
+  },
+  {
+    "symbol": "KEI",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "KEI.NS"
+  },
+  {
+    "symbol": "KIOCL",
+    "sector": "METALS",
+    "yahoo": "KIOCL.NS"
+  },
+  {
+    "symbol": "KNRCON",
+    "sector": "CONSTRUCTION",
+    "yahoo": "KNRCON.NS"
+  },
+  {
+    "symbol": "KRBL",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "KRBL.NS"
+  },
+  {
+    "symbol": "KAJARIACER",
+    "sector": "CONSTRUCTION",
+    "yahoo": "KAJARIACER.NS"
+  },
+  {
+    "symbol": "KALPATPOWR",
+    "sector": "ENERGY",
+    "yahoo": "KALPATPOWR.NS"
+  },
+  {
+    "symbol": "KANSAINER",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "KANSAINER.NS"
+  },
+  {
+    "symbol": "KTKBANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "KTKBANK.NS"
+  },
+  {
+    "symbol": "KARURVYSYA",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "KARURVYSYA.NS"
+  },
+  {
+    "symbol": "KSCL",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "KSCL.NS"
+  },
+  {
+    "symbol": "KEC",
+    "sector": "CONSTRUCTION",
+    "yahoo": "KEC.NS"
+  },
+  {
+    "symbol": "KIRLOSENG",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "KIRLOSENG.NS"
+  },
+  {
+    "symbol": "KOLTEPATIL",
+    "sector": "CONSTRUCTION",
+    "yahoo": "KOLTEPATIL.NS"
+  },
+  {
+    "symbol": "KOTAKBANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "KOTAKBANK.NS"
+  },
+  {
+    "symbol": "L&TFH",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "L&TFH.NS"
+  },
+  {
+    "symbol": "LTTS",
+    "sector": "IT",
+    "yahoo": "LTTS.NS"
+  },
+  {
+    "symbol": "LICHSGFIN",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "LICHSGFIN.NS"
+  },
+  {
+    "symbol": "LAXMIMACH",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "LAXMIMACH.NS"
+  },
+  {
+    "symbol": "LAKSHVILAS",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "LAKSHVILAS.NS"
+  },
+  {
+    "symbol": "LTI",
+    "sector": "IT",
+    "yahoo": "LTI.NS"
+  },
+  {
+    "symbol": "LT",
+    "sector": "CONSTRUCTION",
+    "yahoo": "LT.NS"
+  },
+  {
+    "symbol": "LAURUSLABS",
+    "sector": "PHARMA",
+    "yahoo": "LAURUSLABS.NS"
+  },
+  {
+    "symbol": "LEMONTREE",
+    "sector": "SERVICES",
+    "yahoo": "LEMONTREE.NS"
+  },
+  {
+    "symbol": "LINDEINDIA",
+    "sector": "CHEMICALS",
+    "yahoo": "LINDEINDIA.NS"
+  },
+  {
+    "symbol": "LUPIN",
+    "sector": "PHARMA",
+    "yahoo": "LUPIN.NS"
+  },
+  {
+    "symbol": "LUXIND",
+    "sector": "TEXTILES",
+    "yahoo": "LUXIND.NS"
+  },
+  {
+    "symbol": "MASFIN",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "MASFIN.NS"
+  },
+  {
+    "symbol": "MMTC",
+    "sector": "SERVICES",
+    "yahoo": "MMTC.NS"
+  },
+  {
+    "symbol": "MOIL",
+    "sector": "METALS",
+    "yahoo": "MOIL.NS"
+  },
+  {
+    "symbol": "MRF",
+    "sector": "AUTOMOBILE",
+    "yahoo": "MRF.NS"
+  },
+  {
+    "symbol": "MAGMA",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "MAGMA.NS"
+  },
+  {
+    "symbol": "MGL",
+    "sector": "ENERGY",
+    "yahoo": "MGL.NS"
+  },
+  {
+    "symbol": "MAHSCOOTER",
+    "sector": "AUTOMOBILE",
+    "yahoo": "MAHSCOOTER.NS"
+  },
+  {
+    "symbol": "MAHSEAMLES",
+    "sector": "METALS",
+    "yahoo": "MAHSEAMLES.NS"
+  },
+  {
+    "symbol": "M&MFIN",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "M&MFIN.NS"
+  },
+  {
+    "symbol": "M&M",
+    "sector": "AUTOMOBILE",
+    "yahoo": "M&M.NS"
+  },
+  {
+    "symbol": "MAHINDCIE",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "MAHINDCIE.NS"
+  },
+  {
+    "symbol": "MHRIL",
+    "sector": "SERVICES",
+    "yahoo": "MHRIL.NS"
+  },
+  {
+    "symbol": "MAHLOG",
+    "sector": "SERVICES",
+    "yahoo": "MAHLOG.NS"
+  },
+  {
+    "symbol": "MANAPPURAM",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "MANAPPURAM.NS"
+  },
+  {
+    "symbol": "MRPL",
+    "sector": "ENERGY",
+    "yahoo": "MRPL.NS"
+  },
+  {
+    "symbol": "MARICO",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "MARICO.NS"
+  },
+  {
+    "symbol": "MARUTI",
+    "sector": "AUTOMOBILE",
+    "yahoo": "MARUTI.NS"
+  },
+  {
+    "symbol": "MFSL",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "MFSL.NS"
+  },
+  {
+    "symbol": "MAXINDIA",
+    "sector": "HEALTHCARE SERVICES",
+    "yahoo": "MAXINDIA.NS"
+  },
+  {
+    "symbol": "MINDTREE",
+    "sector": "IT",
+    "yahoo": "MINDTREE.NS"
+  },
+  {
+    "symbol": "MINDACORP",
+    "sector": "AUTOMOBILE",
+    "yahoo": "MINDACORP.NS"
+  },
+  {
+    "symbol": "MINDAIND",
+    "sector": "AUTOMOBILE",
+    "yahoo": "MINDAIND.NS"
+  },
+  {
+    "symbol": "MONSANTO",
+    "sector": "FERTILISERS & PESTICIDES",
+    "yahoo": "MONSANTO.NS"
+  },
+  {
+    "symbol": "MOTHERSUMI",
+    "sector": "AUTOMOBILE",
+    "yahoo": "MOTHERSUMI.NS"
+  },
+  {
+    "symbol": "MOTILALOFS",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "MOTILALOFS.NS"
+  },
+  {
+    "symbol": "MPHASIS",
+    "sector": "IT",
+    "yahoo": "MPHASIS.NS"
+  },
+  {
+    "symbol": "MUTHOOTFIN",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "MUTHOOTFIN.NS"
+  },
+  {
+    "symbol": "NATCOPHARM",
+    "sector": "PHARMA",
+    "yahoo": "NATCOPHARM.NS"
+  },
+  {
+    "symbol": "NBCC",
+    "sector": "CONSTRUCTION",
+    "yahoo": "NBCC.NS"
+  },
+  {
+    "symbol": "NCC",
+    "sector": "CONSTRUCTION",
+    "yahoo": "NCC.NS"
+  },
+  {
+    "symbol": "NESCO",
+    "sector": "SERVICES",
+    "yahoo": "NESCO.NS"
+  },
+  {
+    "symbol": "NHPC",
+    "sector": "ENERGY",
+    "yahoo": "NHPC.NS"
+  },
+  {
+    "symbol": "NIITTECH",
+    "sector": "IT",
+    "yahoo": "NIITTECH.NS"
+  },
+  {
+    "symbol": "NLCINDIA",
+    "sector": "ENERGY",
+    "yahoo": "NLCINDIA.NS"
+  },
+  {
+    "symbol": "NMDC",
+    "sector": "METALS",
+    "yahoo": "NMDC.NS"
+  },
+  {
+    "symbol": "NTPC",
+    "sector": "ENERGY",
+    "yahoo": "NTPC.NS"
+  },
+  {
+    "symbol": "NH",
+    "sector": "HEALTHCARE SERVICES",
+    "yahoo": "NH.NS"
+  },
+  {
+    "symbol": "NATIONALUM",
+    "sector": "METALS",
+    "yahoo": "NATIONALUM.NS"
+  },
+  {
+    "symbol": "NFL",
+    "sector": "FERTILISERS & PESTICIDES",
+    "yahoo": "NFL.NS"
+  },
+  {
+    "symbol": "NBVENTURES",
+    "sector": "ENERGY",
+    "yahoo": "NBVENTURES.NS"
+  },
+  {
+    "symbol": "NAVINFLUOR",
+    "sector": "CHEMICALS",
+    "yahoo": "NAVINFLUOR.NS"
+  },
+  {
+    "symbol": "NETWORK18",
+    "sector": "MEDIA & ENTERTAINMENT",
+    "yahoo": "NETWORK18.NS"
+  },
+  {
+    "symbol": "NILKAMAL",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "NILKAMAL.NS"
+  },
+  {
+    "symbol": "OBEROIRLTY",
+    "sector": "CONSTRUCTION",
+    "yahoo": "OBEROIRLTY.NS"
+  },
+  {
+    "symbol": "ONGC",
+    "sector": "ENERGY",
+    "yahoo": "ONGC.NS"
+  },
+  {
+    "symbol": "OIL",
+    "sector": "ENERGY",
+    "yahoo": "OIL.NS"
+  },
+  {
+    "symbol": "OMAXE",
+    "sector": "CONSTRUCTION",
+    "yahoo": "OMAXE.NS"
+  },
+  {
+    "symbol": "OFSS",
+    "sector": "IT",
+    "yahoo": "OFSS.NS"
+  },
+  {
+    "symbol": "ORIENTCEM",
+    "sector": "CEMENT & CEMENT PRODUCTS",
+    "yahoo": "ORIENTCEM.NS"
+  },
+  {
+    "symbol": "ORIENTELEC",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "ORIENTELEC.NS"
+  },
+  {
+    "symbol": "ORIENTBANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "ORIENTBANK.NS"
+  },
+  {
+    "symbol": "PCJEWELLER",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "PCJEWELLER.NS"
+  },
+  {
+    "symbol": "PIIND",
+    "sector": "FERTILISERS & PESTICIDES",
+    "yahoo": "PIIND.NS"
+  },
+  {
+    "symbol": "PNBHOUSING",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "PNBHOUSING.NS"
+  },
+  {
+    "symbol": "PNCINFRA",
+    "sector": "CONSTRUCTION",
+    "yahoo": "PNCINFRA.NS"
+  },
+  {
+    "symbol": "PTC",
+    "sector": "ENERGY",
+    "yahoo": "PTC.NS"
+  },
+  {
+    "symbol": "PVR",
+    "sector": "MEDIA & ENTERTAINMENT",
+    "yahoo": "PVR.NS"
+  },
+  {
+    "symbol": "PAGEIND",
+    "sector": "TEXTILES",
+    "yahoo": "PAGEIND.NS"
+  },
+  {
+    "symbol": "PARAGMILK",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "PARAGMILK.NS"
+  },
+  {
+    "symbol": "PERSISTENT",
+    "sector": "IT",
+    "yahoo": "PERSISTENT.NS"
+  },
+  {
+    "symbol": "PETRONET",
+    "sector": "ENERGY",
+    "yahoo": "PETRONET.NS"
+  },
+  {
+    "symbol": "PFIZER",
+    "sector": "PHARMA",
+    "yahoo": "PFIZER.NS"
+  },
+  {
+    "symbol": "PHILIPCARB",
+    "sector": "CHEMICALS",
+    "yahoo": "PHILIPCARB.NS"
+  },
+  {
+    "symbol": "PHOENIXLTD",
+    "sector": "CONSTRUCTION",
+    "yahoo": "PHOENIXLTD.NS"
+  },
+  {
+    "symbol": "PIDILITIND",
+    "sector": "CHEMICALS",
+    "yahoo": "PIDILITIND.NS"
+  },
+  {
+    "symbol": "PEL",
+    "sector": "PHARMA",
+    "yahoo": "PEL.NS"
+  },
+  {
+    "symbol": "PFC",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "PFC.NS"
+  },
+  {
+    "symbol": "POWERGRID",
+    "sector": "ENERGY",
+    "yahoo": "POWERGRID.NS"
+  },
+  {
+    "symbol": "PRAJIND",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "PRAJIND.NS"
+  },
+  {
+    "symbol": "PRESTIGE",
+    "sector": "CONSTRUCTION",
+    "yahoo": "PRESTIGE.NS"
+  },
+  {
+    "symbol": "PRSMJOHNSN",
+    "sector": "CEMENT & CEMENT PRODUCTS",
+    "yahoo": "PRSMJOHNSN.NS"
+  },
+  {
+    "symbol": "PGHL",
+    "sector": "PHARMA",
+    "yahoo": "PGHL.NS"
+  },
+  {
+    "symbol": "PGHH",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "PGHH.NS"
+  },
+  {
+    "symbol": "PNB",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "PNB.NS"
+  },
+  {
+    "symbol": "QUESS",
+    "sector": "SERVICES",
+    "yahoo": "QUESS.NS"
+  },
+  {
+    "symbol": "RBLBANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "RBLBANK.NS"
+  },
+  {
+    "symbol": "RECLTD",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "RECLTD.NS"
+  },
+  {
+    "symbol": "RITES",
+    "sector": "CONSTRUCTION",
+    "yahoo": "RITES.NS"
+  },
+  {
+    "symbol": "RADICO",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "RADICO.NS"
+  },
+  {
+    "symbol": "RAIN",
+    "sector": "CHEMICALS",
+    "yahoo": "RAIN.NS"
+  },
+  {
+    "symbol": "RAJESHEXPO",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "RAJESHEXPO.NS"
+  },
+  {
+    "symbol": "RALLIS",
+    "sector": "FERTILISERS & PESTICIDES",
+    "yahoo": "RALLIS.NS"
+  },
+  {
+    "symbol": "RKFORGE",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "RKFORGE.NS"
+  },
+  {
+    "symbol": "RCF",
+    "sector": "FERTILISERS & PESTICIDES",
+    "yahoo": "RCF.NS"
+  },
+  {
+    "symbol": "RAYMOND",
+    "sector": "TEXTILES",
+    "yahoo": "RAYMOND.NS"
+  },
+  {
+    "symbol": "REDINGTON",
+    "sector": "SERVICES",
+    "yahoo": "REDINGTON.NS"
+  },
+  {
+    "symbol": "RELAXO",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "RELAXO.NS"
+  },
+  {
+    "symbol": "RELCAPITAL",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "RELCAPITAL.NS"
+  },
+  {
+    "symbol": "RCOM",
+    "sector": "TELECOM",
+    "yahoo": "RCOM.NS"
+  },
+  {
+    "symbol": "RHFL",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "RHFL.NS"
+  },
+  {
+    "symbol": "RELIANCE",
+    "sector": "ENERGY",
+    "yahoo": "RELIANCE.NS"
+  },
+  {
+    "symbol": "RELINFRA",
+    "sector": "ENERGY",
+    "yahoo": "RELINFRA.NS"
+  },
+  {
+    "symbol": "RNAM",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "RNAM.NS"
+  },
+  {
+    "symbol": "RPOWER",
+    "sector": "ENERGY",
+    "yahoo": "RPOWER.NS"
+  },
+  {
+    "symbol": "REPCOHOME",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "REPCOHOME.NS"
+  },
+  {
+    "symbol": "RUPA",
+    "sector": "TEXTILES",
+    "yahoo": "RUPA.NS"
+  },
+  {
+    "symbol": "SHK",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "SHK.NS"
+  },
+  {
+    "symbol": "SBILIFE",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "SBILIFE.NS"
+  },
+  {
+    "symbol": "SJVN",
+    "sector": "ENERGY",
+    "yahoo": "SJVN.NS"
+  },
+  {
+    "symbol": "SKFINDIA",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "SKFINDIA.NS"
+  },
+  {
+    "symbol": "SREINFRA",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "SREINFRA.NS"
+  },
+  {
+    "symbol": "SRF",
+    "sector": "TEXTILES",
+    "yahoo": "SRF.NS"
+  },
+  {
+    "symbol": "SADBHAV",
+    "sector": "CONSTRUCTION",
+    "yahoo": "SADBHAV.NS"
+  },
+  {
+    "symbol": "SANOFI",
+    "sector": "PHARMA",
+    "yahoo": "SANOFI.NS"
+  },
+  {
+    "symbol": "SCHAEFFLER",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "SCHAEFFLER.NS"
+  },
+  {
+    "symbol": "SIS",
+    "sector": "SERVICES",
+    "yahoo": "SIS.NS"
+  },
+  {
+    "symbol": "SHANKARA",
+    "sector": "METALS",
+    "yahoo": "SHANKARA.NS"
+  },
+  {
+    "symbol": "SHARDACROP",
+    "sector": "FERTILISERS & PESTICIDES",
+    "yahoo": "SHARDACROP.NS"
+  },
+  {
+    "symbol": "SFL",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "SFL.NS"
+  },
+  {
+    "symbol": "SHILPAMED",
+    "sector": "PHARMA",
+    "yahoo": "SHILPAMED.NS"
+  },
+  {
+    "symbol": "SCI",
+    "sector": "SERVICES",
+    "yahoo": "SCI.NS"
+  },
+  {
+    "symbol": "SHOPERSTOP",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "SHOPERSTOP.NS"
+  },
+  {
+    "symbol": "SHREECEM",
+    "sector": "CEMENT & CEMENT PRODUCTS",
+    "yahoo": "SHREECEM.NS"
+  },
+  {
+    "symbol": "RENUKA",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "RENUKA.NS"
+  },
+  {
+    "symbol": "SHRIRAMCIT",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "SHRIRAMCIT.NS"
+  },
+  {
+    "symbol": "SRTRANSFIN",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "SRTRANSFIN.NS"
+  },
+  {
+    "symbol": "SIEMENS",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "SIEMENS.NS"
+  },
+  {
+    "symbol": "SPTL",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "SPTL.NS"
+  },
+  {
+    "symbol": "SOBHA",
+    "sector": "CONSTRUCTION",
+    "yahoo": "SOBHA.NS"
+  },
+  {
+    "symbol": "SOLARINDS",
+    "sector": "CHEMICALS",
+    "yahoo": "SOLARINDS.NS"
+  },
+  {
+    "symbol": "SONATSOFTW",
+    "sector": "IT",
+    "yahoo": "SONATSOFTW.NS"
+  },
+  {
+    "symbol": "SOUTHBANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "SOUTHBANK.NS"
+  },
+  {
+    "symbol": "STARCEMENT",
+    "sector": "CEMENT & CEMENT PRODUCTS",
+    "yahoo": "STARCEMENT.NS"
+  },
+  {
+    "symbol": "SBIN",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "SBIN.NS"
+  },
+  {
+    "symbol": "SAIL",
+    "sector": "METALS",
+    "yahoo": "SAIL.NS"
+  },
+  {
+    "symbol": "STRTECH",
+    "sector": "TELECOM",
+    "yahoo": "STRTECH.NS"
+  },
+  {
+    "symbol": "STAR",
+    "sector": "PHARMA",
+    "yahoo": "STAR.NS"
+  },
+  {
+    "symbol": "SUDARSCHEM",
+    "sector": "CHEMICALS",
+    "yahoo": "SUDARSCHEM.NS"
+  },
+  {
+    "symbol": "SPARC",
+    "sector": "PHARMA",
+    "yahoo": "SPARC.NS"
+  },
+  {
+    "symbol": "SUNPHARMA",
+    "sector": "PHARMA",
+    "yahoo": "SUNPHARMA.NS"
+  },
+  {
+    "symbol": "SUNTV",
+    "sector": "MEDIA & ENTERTAINMENT",
+    "yahoo": "SUNTV.NS"
+  },
+  {
+    "symbol": "SUNCLAYLTD",
+    "sector": "AUTOMOBILE",
+    "yahoo": "SUNCLAYLTD.NS"
+  },
+  {
+    "symbol": "SUNDARMFIN",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "SUNDARMFIN.NS"
+  },
+  {
+    "symbol": "SUNDRMFAST",
+    "sector": "AUTOMOBILE",
+    "yahoo": "SUNDRMFAST.NS"
+  },
+  {
+    "symbol": "SUNTECK",
+    "sector": "CONSTRUCTION",
+    "yahoo": "SUNTECK.NS"
+  },
+  {
+    "symbol": "SUPRAJIT",
+    "sector": "AUTOMOBILE",
+    "yahoo": "SUPRAJIT.NS"
+  },
+  {
+    "symbol": "SUPREMEIND",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "SUPREMEIND.NS"
+  },
+  {
+    "symbol": "SUVEN",
+    "sector": "PHARMA",
+    "yahoo": "SUVEN.NS"
+  },
+  {
+    "symbol": "SUZLON",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "SUZLON.NS"
+  },
+  {
+    "symbol": "SWANENERGY",
+    "sector": "TEXTILES",
+    "yahoo": "SWANENERGY.NS"
+  },
+  {
+    "symbol": "SYMPHONY",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "SYMPHONY.NS"
+  },
+  {
+    "symbol": "SYNDIBANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "SYNDIBANK.NS"
+  },
+  {
+    "symbol": "SYNGENE",
+    "sector": "PHARMA",
+    "yahoo": "SYNGENE.NS"
+  },
+  {
+    "symbol": "TCNSBRANDS",
+    "sector": "TEXTILES",
+    "yahoo": "TCNSBRANDS.NS"
+  },
+  {
+    "symbol": "TTKPRESTIG",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "TTKPRESTIG.NS"
+  },
+  {
+    "symbol": "TVTODAY",
+    "sector": "MEDIA & ENTERTAINMENT",
+    "yahoo": "TVTODAY.NS"
+  },
+  {
+    "symbol": "TV18BRDCST",
+    "sector": "MEDIA & ENTERTAINMENT",
+    "yahoo": "TV18BRDCST.NS"
+  },
+  {
+    "symbol": "TVSMOTOR",
+    "sector": "AUTOMOBILE",
+    "yahoo": "TVSMOTOR.NS"
+  },
+  {
+    "symbol": "TAKE",
+    "sector": "IT",
+    "yahoo": "TAKE.NS"
+  },
+  {
+    "symbol": "TNPL",
+    "sector": "PAPER",
+    "yahoo": "TNPL.NS"
+  },
+  {
+    "symbol": "TATACHEM",
+    "sector": "CHEMICALS",
+    "yahoo": "TATACHEM.NS"
+  },
+  {
+    "symbol": "TATACOFFEE",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "TATACOFFEE.NS"
+  },
+  {
+    "symbol": "TCS",
+    "sector": "IT",
+    "yahoo": "TCS.NS"
+  },
+  {
+    "symbol": "TATAELXSI",
+    "sector": "IT",
+    "yahoo": "TATAELXSI.NS"
+  },
+  {
+    "symbol": "TATAGLOBAL",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "TATAGLOBAL.NS"
+  },
+  {
+    "symbol": "TATAINVEST",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "TATAINVEST.NS"
+  },
+  {
+    "symbol": "TATAMTRDVR",
+    "sector": "AUTOMOBILE",
+    "yahoo": "TATAMTRDVR.NS"
+  },
+  {
+    "symbol": "TATAMOTORS",
+    "sector": "AUTOMOBILE",
+    "yahoo": "TATAMOTORS.NS"
+  },
+  {
+    "symbol": "TATAPOWER",
+    "sector": "ENERGY",
+    "yahoo": "TATAPOWER.NS"
+  },
+  {
+    "symbol": "TATASTEEL",
+    "sector": "METALS",
+    "yahoo": "TATASTEEL.NS"
+  },
+  {
+    "symbol": "TEAMLEASE",
+    "sector": "SERVICES",
+    "yahoo": "TEAMLEASE.NS"
+  },
+  {
+    "symbol": "TECHM",
+    "sector": "IT",
+    "yahoo": "TECHM.NS"
+  },
+  {
+    "symbol": "NIACL",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "NIACL.NS"
+  },
+  {
+    "symbol": "RAMCOCEM",
+    "sector": "CEMENT & CEMENT PRODUCTS",
+    "yahoo": "RAMCOCEM.NS"
+  },
+  {
+    "symbol": "THERMAX",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "THERMAX.NS"
+  },
+  {
+    "symbol": "THOMASCOOK",
+    "sector": "SERVICES",
+    "yahoo": "THOMASCOOK.NS"
+  },
+  {
+    "symbol": "THYROCARE",
+    "sector": "HEALTHCARE SERVICES",
+    "yahoo": "THYROCARE.NS"
+  },
+  {
+    "symbol": "TIMETECHNO",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "TIMETECHNO.NS"
+  },
+  {
+    "symbol": "TIMKEN",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "TIMKEN.NS"
+  },
+  {
+    "symbol": "TITAN",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "TITAN.NS"
+  },
+  {
+    "symbol": "TORNTPHARM",
+    "sector": "PHARMA",
+    "yahoo": "TORNTPHARM.NS"
+  },
+  {
+    "symbol": "TORNTPOWER",
+    "sector": "ENERGY",
+    "yahoo": "TORNTPOWER.NS"
+  },
+  {
+    "symbol": "TRENT",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "TRENT.NS"
+  },
+  {
+    "symbol": "TRIDENT",
+    "sector": "TEXTILES",
+    "yahoo": "TRIDENT.NS"
+  },
+  {
+    "symbol": "TRITURBINE",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "TRITURBINE.NS"
+  },
+  {
+    "symbol": "TIINDIA",
+    "sector": "AUTOMOBILE",
+    "yahoo": "TIINDIA.NS"
+  },
+  {
+    "symbol": "UCOBANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "UCOBANK.NS"
+  },
+  {
+    "symbol": "UFLEX",
+    "sector": "INDUSTRIAL MANUFACTURING",
+    "yahoo": "UFLEX.NS"
+  },
+  {
+    "symbol": "UPL",
+    "sector": "FERTILISERS & PESTICIDES",
+    "yahoo": "UPL.NS"
+  },
+  {
+    "symbol": "UJJIVAN",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "UJJIVAN.NS"
+  },
+  {
+    "symbol": "ULTRACEMCO",
+    "sector": "CEMENT & CEMENT PRODUCTS",
+    "yahoo": "ULTRACEMCO.NS"
+  },
+  {
+    "symbol": "UNIONBANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "UNIONBANK.NS"
+  },
+  {
+    "symbol": "UBL",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "UBL.NS"
+  },
+  {
+    "symbol": "MCDOWELL-N",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "MCDOWELL-N.NS"
+  },
+  {
+    "symbol": "VGUARD",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "VGUARD.NS"
+  },
+  {
+    "symbol": "VMART",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "VMART.NS"
+  },
+  {
+    "symbol": "VIPIND",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "VIPIND.NS"
+  },
+  {
+    "symbol": "VRLLOG",
+    "sector": "SERVICES",
+    "yahoo": "VRLLOG.NS"
+  },
+  {
+    "symbol": "VSTIND",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "VSTIND.NS"
+  },
+  {
+    "symbol": "WABAG",
+    "sector": "SERVICES",
+    "yahoo": "WABAG.NS"
+  },
+  {
+    "symbol": "VAKRANGEE",
+    "sector": "IT",
+    "yahoo": "VAKRANGEE.NS"
+  },
+  {
+    "symbol": "VTL",
+    "sector": "TEXTILES",
+    "yahoo": "VTL.NS"
+  },
+  {
+    "symbol": "VARROC",
+    "sector": "AUTOMOBILE",
+    "yahoo": "VARROC.NS"
+  },
+  {
+    "symbol": "VBL",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "VBL.NS"
+  },
+  {
+    "symbol": "VEDL",
+    "sector": "METALS",
+    "yahoo": "VEDL.NS"
+  },
+  {
+    "symbol": "VENKEYS",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "VENKEYS.NS"
+  },
+  {
+    "symbol": "VINATIORGA",
+    "sector": "CHEMICALS",
+    "yahoo": "VINATIORGA.NS"
+  },
+  {
+    "symbol": "IDEA",
+    "sector": "TELECOM",
+    "yahoo": "IDEA.NS"
+  },
+  {
+    "symbol": "VOLTAS",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "VOLTAS.NS"
+  },
+  {
+    "symbol": "WABCOINDIA",
+    "sector": "AUTOMOBILE",
+    "yahoo": "WABCOINDIA.NS"
+  },
+  {
+    "symbol": "WELCORP",
+    "sector": "METALS",
+    "yahoo": "WELCORP.NS"
+  },
+  {
+    "symbol": "WELSPUNIND",
+    "sector": "TEXTILES",
+    "yahoo": "WELSPUNIND.NS"
+  },
+  {
+    "symbol": "WHIRLPOOL",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "WHIRLPOOL.NS"
+  },
+  {
+    "symbol": "WIPRO",
+    "sector": "IT",
+    "yahoo": "WIPRO.NS"
+  },
+  {
+    "symbol": "WOCKPHARMA",
+    "sector": "PHARMA",
+    "yahoo": "WOCKPHARMA.NS"
+  },
+  {
+    "symbol": "YESBANK",
+    "sector": "FINANCIAL SERVICES",
+    "yahoo": "YESBANK.NS"
+  },
+  {
+    "symbol": "ZEEL",
+    "sector": "MEDIA & ENTERTAINMENT",
+    "yahoo": "ZEEL.NS"
+  },
+  {
+    "symbol": "ZENSARTECH",
+    "sector": "IT",
+    "yahoo": "ZENSARTECH.NS"
+  },
+  {
+    "symbol": "ZYDUSWELL",
+    "sector": "CONSUMER GOODS",
+    "yahoo": "ZYDUSWELL.NS"
+  },
+  {
+    "symbol": "ECLERX",
+    "sector": "IT",
+    "yahoo": "ECLERX.NS"
+  }
+]

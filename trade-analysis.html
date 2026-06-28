@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AGY-TRADER | Trade Analysis & Decision Intelligence</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #0b0f19;
+    }
+    .analysis-header {
+      height: 60px;
+      background: rgba(17, 24, 39, 0.95);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+    }
+    .analysis-container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    .chart-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 15px;
+      gap: 12px;
+      position: relative;
+    }
+    .sidebar-section {
+      width: 320px;
+      background: rgba(17, 24, 39, 0.95);
+      border-left: 1px solid rgba(255,255,255,0.06);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto;
+    }
+    #tv-chart-container {
+      flex: 1;
+      background: rgba(0,0,0,0.25);
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.04);
+      overflow: hidden;
+      position: relative;
+    }
+    #tv-rsi-container {
+      height: 120px;
+      background: rgba(0,0,0,0.25);
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.04);
+      overflow: hidden;
+      position: relative;
+    }
+    .replay-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: rgba(0,0,0,0.3);
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .sidebar-header {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      color: var(--accent-blue);
+      margin: 0 0 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding-bottom: 8px;
+    }
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.85rem;
+      transition: color 0.2s;
+    }
+    .back-btn:hover {
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="analysis-header">
+    <div style="display: flex; align-items: center; gap: 15px;">
+      <a href="/" class="back-btn"><i data-lucide="arrow-left"></i> Back to Dashboard</a>
+      <div style="display: flex; align-items: center; gap: 10px; margin-left: 10px;">
+        <span class="logo-icon" style="padding: 4px; border-radius: 6px;"><i data-lucide="candlestick-chart"></i></span>
+        <h2 id="symbol-header" class="monospace font-bold" style="margin: 0; font-size: 1.2rem; color: white;">--</h2>
+        <span id="mode-badge" class="badge text-xxs font-semibold" style="padding: 2px 6px; border-radius: 4px; background: rgba(59, 130, 246, 0.15); color: var(--accent-blue);">--</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 5px; margin-left: 15px; cursor: pointer;" onclick="toggleBackendSettings()">
+        <i data-lucide="settings" style="width: 14px; height: 14px; color: rgba(255,255,255,0.6);"></i>
+        <span style="color: rgba(255,255,255,0.6); font-size: 0.8rem; font-weight: 500;">Config</span>
+      </div>
+    </div>
+
+    <!-- Replay Engine Pane -->
+    <div class="replay-bar">
+      <span class="monospace text-xxs" style="color: rgba(255,255,255,0.4);">REPLAY:</span>
+      <button id="btn-replay-play" class="btn text-xs" style="padding: 4px 10px;"><i data-lucide="play" style="width:12px;height:12px;display:inline-block;vertical-align:middle;"></i> Play</button>
+      <button id="btn-replay-pause" class="btn text-xs" style="padding: 4px 10px; display:none;"><i data-lucide="pause" style="width:12px;height:12px;display:inline-block;vertical-align:middle;"></i> Pause</button>
+      <button id="btn-replay-back" class="btn text-xs" style="padding: 4px 10px;"><i data-lucide="skip-back" style="width:12px;height:12px;display:inline-block;vertical-align:middle;"></i> Back</button>
+      <button id="btn-replay-step" class="btn text-xs" style="padding: 4px 10px;"><i data-lucide="skip-forward" style="width:12px;height:12px;display:inline-block;vertical-align:middle;"></i> Step</button>
+    </div>
+  </header>
+
+  <!-- Main Split Interface -->
+  <div class="analysis-container">
+    
+    <!-- Left Section: Chart Area -->
+    <section class="chart-section">
+      <!-- Lightweight Candlestick Chart -->
+      <div id="tv-chart-container"></div>
+      
+      <!-- Subchart: RSI Pane -->
+      <div id="tv-rsi-container"></div>
+    </section>
+
+    <!-- Right Sidebar Section -->
+    <aside class="sidebar-section">
+      
+      <!-- AI Decision Intelligence -->
+      <div>
+        <h3 class="sidebar-header"><i data-lucide="brain"></i> AI Decision Panel</h3>
+        <div class="intelligence-grid text-xs monospace" style="display: grid; grid-template-columns: 1fr; gap: 8px;">
+          <div class="flex-between"><span>Symbol:</span><b id="intel-symbol" class="text-white">--</b></div>
+          <div class="flex-between"><span>Current Price:</span><b id="intel-current-price">--</b></div>
+          <div class="flex-between"><span>Entry Price:</span><b id="intel-entry-price">--</b></div>
+          <div class="flex-between"><span>Target:</span><b id="intel-target-price">--</b></div>
+          <div class="flex-between"><span>Stop Loss:</span><b id="intel-stop-loss">--</b></div>
+          <div class="flex-between"><span>Risk Reward Ratio:</span><b id="intel-rrr">--</b></div>
+          <div class="flex-between"><span>TQS Score:</span><b id="intel-tqs">--</b></div>
+          <div class="flex-between"><span>ICS Score:</span><b id="intel-ics">--</b></div>
+          <div class="flex-between"><span>Market Regime:</span><b id="intel-regime">--</b></div>
+          <div class="flex-between"><span>Consensus Votes:</span><b id="intel-consensus-votes">--</b></div>
+        </div>
+        
+        <div style="margin-top: 12px;">
+          <span class="text-xxs" style="color: rgba(255,255,255,0.4); text-transform: uppercase; display: block; margin-bottom: 4px;">Agent Vote Breakdown:</span>
+          <div id="intel-agent-votes" class="text-xxs monospace" style="color: var(--text-secondary); max-height: 120px; overflow-y: auto; display: grid; grid-template-columns: 1fr; gap: 4px; border: 1px solid rgba(255,255,255,0.06); padding: 6px; border-radius: 4px; background: rgba(0,0,0,0.15);">
+            --
+          </div>
+        </div>
+      </div>
+
+      <!-- Prediction Engine -->
+      <div style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 15px;">
+        <h3 class="sidebar-header"><i data-lucide="trending-up"></i> Prediction Engine</h3>
+        <div class="intelligence-grid text-xs monospace" style="display: grid; grid-template-columns: 1fr; gap: 8px;">
+          <div class="flex-between"><span>Horizon:</span><b style="color: #a855f7;">SHORT TERM / NEXT CANDLE</b></div>
+          <div class="flex-between"><span>Direction:</span><span id="pred-direction" class="badge">--</span></div>
+          <div class="flex-between"><span>Probability:</span><b id="pred-probability">--</b></div>
+          <div class="flex-between"><span>Expected Move:</span><b id="pred-move">--</b></div>
+          <div class="flex-between"><span>Expected Target:</span><b id="pred-target">--</b></div>
+          <div class="flex-between"><span>Expected Stop:</span><b id="pred-stop">--</b></div>
+        </div>
+        
+        <div style="margin-top: 12px;">
+          <span class="text-xxs" style="color: rgba(255,255,255,0.4); text-transform: uppercase; display: block; margin-bottom: 4px;">AI Reasoning & Conditions:</span>
+          <div id="pred-reasoning" class="text-xxs monospace" style="color: var(--text-secondary); line-height: 1.4; background: rgba(0,0,0,0.15); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.06);">
+            Loading AI reasoning registry...
+          </div>
+        </div>
+      </div>
+
+      <!-- Price Action & Structure Agent (Agent 11) -->
+      <div style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 15px;">
+        <h3 class="sidebar-header"><i data-lucide="line-chart"></i> Price Action Agent</h3>
+        <div class="intelligence-grid text-xs monospace" style="display: grid; grid-template-columns: 1fr; gap: 8px;">
+          <div class="flex-between"><span>Structure Score:</span><b id="pa-structure">--</b></div>
+          <div class="flex-between"><span>Pattern Score:</span><b id="pa-pattern">--</b></div>
+          <div class="flex-between"><span>Breakout Score:</span><b id="pa-breakout">--</b></div>
+          <div class="flex-between"><span>Volume Score:</span><b id="pa-volume">--</b></div>
+          <div class="flex-between"><span>Momentum Score:</span><b id="pa-momentum">--</b></div>
+          <div class="flex-between"><span>Risk Reward Score:</span><b id="pa-rr">--</b></div>
+          <div class="flex-between"><span>Final PA Vote:</span><span id="pa-vote" class="badge">--</span></div>
+          <div class="flex-between"><span>Confidence:</span><b id="pa-confidence">--</b></div>
+        </div>
+        <div style="margin-top: 12px;">
+          <span class="text-xxs" style="color: rgba(255,255,255,0.4); text-transform: uppercase; display: block; margin-bottom: 4px;">PA Agent Reasoning:</span>
+          <div id="pa-reasoning" class="text-xxs monospace" style="color: var(--text-secondary); line-height: 1.4; background: rgba(0,0,0,0.15); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.06);">
+            --
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+  </div>
+
+  <!-- TradingView Lightweight Charts standalone library -->
+  <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+  <script>
+    window.toggleBackendSettings = function() {
+      const current = localStorage.getItem('BACKEND_URL') || '';
+      const val = prompt('Enter your Trading Backend URL (e.g. https://your-backend.onrender.com):', current);
+      if (val !== null) {
+        localStorage.setItem('BACKEND_URL', val.trim());
+        window.location.reload();
+      }
+    };
+  </script>
+  <script src="trade-analysis.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

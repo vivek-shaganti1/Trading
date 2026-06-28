@@ -1,0 +1,33 @@
+# Dependency directories
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*
+
+# Logs and backtests
+logs/
+*.log
+BACKTEST_REPORT_*.md
+DRAWDOWN_REDUCTION_REPORT.md
+LEGACY_PURGE_REPORT.md
+PROFIT_FACTOR_ANALYSIS.md
+SHARPE_IMPROVEMENT_REPORT.md
+SMC_VALIDATION_REPORT.md
+TRADE_FAILURE_ANALYSIS.md
+
+# Local Databases and Backups
+db.json
+db_*.json
+db_hold_audit.json
+db_test.json
+
+# IDE / System files
+.DS_Store
+Thumbs.db
+.claude/
+.gemini/
+.agents/
+.vscode/
+.idea/

@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AGY-TRADER | Institutional Quant Command Station</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- Hidden Rejected Candidates Modal -->
+  <div id="rejected-candidates-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i data-lucide="filter-x"></i> Rejected Funnel Candidates</h3>
+        <span class="close-modal" onclick="closeModal()">&times;</span>
+      </div>
+      <div class="modal-body" id="rejected-candidates-list">
+        <p class="empty-table">No rejected candidates logged for this stage.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden Telegram Detail Modal -->
+  <div id="telegram-msg-modal" class="modal">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3><i data-lucide="send"></i> Full Message Payload</h3>
+        <span class="close-modal" onclick="closeTelegramModal()">&times;</span>
+      </div>
+      <div class="modal-body monospace" id="telegram-msg-content" style="white-space: pre-wrap; word-break: break-all; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px;">
+        <!-- Filled dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-wrapper">
+    <!-- Header -->
+    <header class="dashboard-header">
+      <div class="header-container">
+        <div class="logo-area">
+          <div class="logo-icon"><i data-lucide="trending-up"></i></div>
+          <div>
+            <h1 class="logo-text">AGY-TRADER</h1>
+            <span class="logo-subtext">Autonomous Multi-Agent Quant Station</span>
+          </div>
+        </div>
+        
+        <div class="header-status">
+          <div class="status-item">
+            <span class="status-dot connected" id="conn-status-dot"></span>
+            <span class="status-text" id="conn-status-text">WS Connecting</span>
+          </div>
+          <div class="status-item">
+            <span class="status-dot connected" id="bot-status-dot"></span>
+            <span class="status-text" id="bot-status-text">Bot Checking</span>
+          </div>
+          <div class="status-item" id="backend-settings-trigger" style="cursor: pointer; gap: 4px;" onclick="toggleBackendSettings()">
+            <i data-lucide="settings" style="width: 14px; height: 14px; color: rgba(255,255,255,0.6);"></i>
+            <span style="color: rgba(255,255,255,0.6); font-size: 0.8rem;">Config</span>
+          </div>
+          <div class="time-box">
+            <i data-lucide="clock" class="time-icon"></i>
+            <span id="live-time" class="monospace">--:--:-- IST</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Execution Timeline (Phase 8) -->
+    <div class="card glass-card timeline-card-row">
+      <div class="timeline-title-area">
+        <h3><i data-lucide="milestone"></i> Execution Timeline</h3>
+        <span class="monospace text-xs" style="color: rgba(255,255,255,0.4)">Real-time Milestones</span>
+      </div>
+      <div class="timeline-steps" id="session-execution-timeline">
+        <div class="timeline-step">
+          <span class="step-time">09:15</span>
+          <span class="step-label">Market Open</span>
+          <span class="step-dot"></span>
+        </div>
+        <div class="timeline-divider"></div>
+        <div class="timeline-step">
+          <span class="step-time">--:--</span>
+          <span class="step-label">Signal Found</span>
+          <span class="step-dot disabled"></span>
+        </div>
+        <div class="timeline-divider"></div>
+        <div class="timeline-step">
+          <span class="step-time">--:--</span>
+          <span class="step-label">Consensus Passed</span>
+          <span class="step-dot disabled"></span>
+        </div>
+        <div class="timeline-divider"></div>
+        <div class="timeline-step">
+          <span class="step-time">--:--</span>
+          <span class="step-label">Risk Approved</span>
+          <span class="step-dot disabled"></span>
+        </div>
+        <div class="timeline-divider"></div>
+        <div class="timeline-step">
+          <span class="step-time">--:--</span>
+          <span class="step-label">Order Submitted</span>
+          <span class="step-dot disabled"></span>
+        </div>
+        <div class="timeline-divider"></div>
+        <div class="timeline-step">
+          <span class="step-time">--:--</span>
+          <span class="step-label">Order Filled</span>
+          <span class="step-dot disabled"></span>
+        </div>
+      </div>
+    </div>
+
+
+
+    <!-- Main Grid (3 columns) -->
+    <main class="dashboard-main-grid">
+      
+      <!-- COLUMN 1: CONTROLS & COMMAND CENTERS -->
+      <section class="grid-column">
+        
+        <!-- CONTROL PANEL -->
+        <div class="card glass-card">
+          <h2 class="card-title"><i data-lucide="sliders"></i> Operations Control</h2>
+          <p class="card-desc" style="margin-bottom: 10px;">Activate or deactivate the automated trading loop.</p>
+          <div class="control-actions">
+            <button id="btn-toggle-bot" class="btn btn-primary btn-icon w-full">
+              <i data-lucide="play"></i> <span>Start Bot</span>
+            </button>
+          </div>
+          
+          <!-- ADMIN BREACH RESET PANEL -->
+          <div id="admin-reset-panel" style="margin-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 14px; display: none;">
+            <span class="stat-label" style="color: #ef4444; font-weight: 600; font-size: 0.75rem; display: flex; align-items: center; gap: 4px;"><i data-lucide="shield-alert" style="width: 14px; height: 14px;"></i> Secure Admin Reset</span>
+            <p style="font-size: 0.65rem; color: rgba(255,255,255,0.4); margin-top: 4px; margin-bottom: 8px;">Drawdown limit breached. Enter password to manually reset.</p>
+            <div style="display: flex; gap: 8px;">
+              <input type="password" id="admin-reset-password" placeholder="Password" class="monospace text-xs" style="flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.2); color: white;">
+              <button id="btn-admin-reset" class="btn text-xs" style="padding: 6px 12px; background: #ef4444; color: white;">Reset</button>
+            </div>
+            <span id="admin-reset-msg" style="display: block; font-size: 0.65rem; margin-top: 6px;"></span>
+          </div>
+        </div>
+
+        <!-- PROFIT TARGET COMMAND CENTER (Phase 9) -->
+        <div class="card glass-card border-accent-blue">
+          <h2 class="card-title text-blue"><i data-lucide="target"></i> Profit Command Center</h2>
+          <p class="card-desc">Real-time valuation, dynamic targets, and mathematical reachability verification.</p>
+          
+          <!-- Key Metrics Grid -->
+          <div class="metrics-mini-grid">
+            <div class="mini-stat">
+              <span class="label">Current Capital</span>
+              <span id="stat-balance" class="value text-lg text-primary">₹--</span>
+            </div>
+            <div class="mini-stat">
+              <span class="label">Equity Assets</span>
+              <span id="stat-equity" class="value text-lg">₹--</span>
+            </div>
+            <div class="mini-stat" style="grid-column: span 2; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 8px; margin-top: 4px;">
+              <span class="label">Total Portfolio Value</span>
+              <span id="stat-total-value" class="value text-xl font-bold">₹--</span>
+              <span id="stat-net-pnl" class="pnl-badge positive">₹0.00 (0.00%)</span>
+            </div>
+          </div>
+
+          <!-- Daily Target Math -->
+          <div class="target-progress-block" style="margin-top: 15px;">
+            <div class="flex-between text-xs">
+              <span style="color: var(--text-secondary)">Daily Profit Target</span>
+              <span id="target-fraction" class="monospace">₹0 / ₹1,000</span>
+            </div>
+            <div class="progress-bar-container" style="margin-top: 6px;">
+              <div id="target-progress-bar" class="progress-bar-fill" style="width: 0%"></div>
+            </div>
+            <p id="target-growth-message" class="target-growth-msg" style="font-size: 0.65rem; color: rgba(255,255,255,0.4); margin-top: 4px; font-style: italic;">Dynamic target system active.</p>
+          </div>
+
+          <!-- Mathematical Reachability -->
+          <div class="reachability-box" style="margin-top: 15px; padding: 10px; border-radius: 8px; background: rgba(59, 130, 246, 0.04); border: 1px solid rgba(59, 130, 246, 0.1);">
+            <div class="flex-between">
+              <span class="text-xs font-semibold">Target Reachability Rating</span>
+              <span id="target-reachability-badge" class="badge bg-green">HIGH</span>
+            </div>
+            <div id="target-math-calculations" class="text-xxs monospace" style="color: rgba(255,255,255,0.5); margin-top: 6px; line-height: 1.3;">
+              Remaining Target: ₹1,000<br>
+              Required Win Rate: 65%<br>
+              Projected EOD: ₹12,180
+            </div>
+          </div>
+
+          <!-- Target Engine Details -->
+          <div class="target-engine-grid" style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.75rem;">
+            <div class="substat">
+              <span class="substat-label">Remaining Target</span>
+              <span id="target-remaining" class="substat-value">₹1,000.00</span>
+            </div>
+            <div class="substat">
+              <span class="substat-label">Required Profit</span>
+              <span id="target-required-profit" class="substat-value">₹1,000.00</span>
+            </div>
+            <div class="substat">
+              <span class="substat-label">Required Trades</span>
+              <span id="target-required-trades" class="substat-value">--</span>
+            </div>
+            <div class="substat">
+              <span class="substat-label">Required Win Rate</span>
+              <span id="target-required-winrate" class="substat-value">--</span>
+            </div>
+            <div class="substat" style="grid-column: span 2;">
+              <span class="substat-label">Capital Utilization Required</span>
+              <span id="target-capital-utilization" class="substat-value">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- RISK MANAGEMENT LIMITS -->
+        <div class="card glass-card">
+          <h2 class="card-title text-danger"><i data-lucide="shield-alert"></i> Risk Controls</h2>
+          <div class="risk-limits-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div class="risk-indicator">
+              <span class="risk-label">Daily Stop-Loss</span>
+              <span id="risk-daily-limit" class="risk-value red">-₹360.00</span>
+            </div>
+            <div class="risk-indicator">
+              <span class="risk-label">Max Lifetime Loss</span>
+              <span id="risk-lifetime-limit" class="risk-value red">-₹4,000.00</span>
+            </div>
+            <div class="risk-indicator" style="grid-column: span 2;">
+              <span class="risk-label">Strategy Mode</span>
+              <span id="active-strategy" class="strategy-badge day-trading w-full text-center" style="display: block; margin-top: 4px;">DAY_TRADING</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- PROVIDER HEALTH DASHBOARD (Phase 7) -->
+        <div class="card glass-card">
+          <h2 class="card-title"><i data-lucide="activity"></i> Provider Health</h2>
+          <p class="card-desc">Latencies and endpoints success diagnostics.</p>
+          <div class="health-table-wrapper">
+            <table class="diagnostic-table">
+              <thead>
+                <tr>
+                  <th>Provider</th>
+                  <th>Latency</th>
+                  <th>Success %</th>
+                  <th>Errors/Failures</th>
+                  <th>Last Failure</th>
+                  <th>Retries</th>
+                </tr>
+              </thead>
+              <tbody id="provider-health-body">
+                <tr>
+                  <td>Gemini</td>
+                  <td class="monospace font-semibold text-green">120ms</td>
+                  <td class="text-green">100%</td>
+                  <td>200 OK</td>
+                </tr>
+                <tr>
+                  <td>Groq</td>
+                  <td class="monospace font-semibold text-green">85ms</td>
+                  <td class="text-green">100%</td>
+                  <td>200 OK</td>
+                </tr>
+                <tr>
+                  <td>Postgres</td>
+                  <td class="monospace font-semibold text-green">5ms</td>
+                  <td class="text-green">100%</td>
+                  <td>Connected</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- COLUMN 2: CHARTS, TICKERS, INTERACTIVE FUNNEL -->
+      <section class="grid-column">
+        
+        <!-- TICKERS -->
+
+        <!-- TICKERS -->
+        <div class="card glass-card">
+          <div class="tickers-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+            <div class="ticker-box primary-ticker" style="grid-column: span 3;">
+              <span class="ticker-symbol">NIFTY50_MINI</span>
+              <span id="ticker-NIFTY50_MINI" class="ticker-price">₹--</span>
+            </div>
+            <div class="ticker-box">
+              <span class="ticker-symbol">RELIANCE</span>
+              <span id="ticker-RELIANCE" class="ticker-price">₹--</span>
+            </div>
+            <div class="ticker-box">
+              <span class="ticker-symbol">TCS</span>
+              <span id="ticker-TCS" class="ticker-price">₹--</span>
+            </div>
+            <div class="ticker-box">
+              <span class="ticker-symbol">HDFCBANK</span>
+              <span id="ticker-HDFCBANK" class="ticker-price">₹--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- FUNNEL VISUALIZER (Phase 3) -->
+        <div class="card glass-card">
+          <h2 class="card-title"><i data-lucide="filter"></i> 🎯 Funnel Visualizer</h2>
+          <p class="card-desc">Click any stage of the filter stream to inspect rejected candidates.</p>
+          
+          <div class="metrics-tabs" style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <button class="tab-btn active" id="tab-cycle" onclick="switchMetricsTab('cycle')">Current Cycle</button>
+            <button class="tab-btn" id="tab-today" onclick="switchMetricsTab('today')">Today</button>
+            <button class="tab-btn" id="tab-lifetime" onclick="switchMetricsTab('lifetime')">Lifetime</button>
+          </div>
+
+          <!-- Tab Content 1: Funnel Flow (Cycle) -->
+          <div id="metrics-content-cycle" class="tab-content active">
+            <div class="funnel-sankey-container" id="funnel-flow-container">
+              <!-- Flow stages rendered dynamically with Sankey links -->
+            </div>
+          </div>
+
+          <!-- Tab Content 2: Today -->
+          <div id="metrics-content-today" class="tab-content" style="display: none;">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 0.75rem;">
+              <div class="mini-stat-card">
+                <span>Net PnL</span>
+                <b id="today-net-pnl" class="monospace text-lg">₹0.00</b>
+              </div>
+              <div class="mini-stat-card">
+                <span>Trades Closed</span>
+                <b id="today-total-trades" class="monospace text-lg">0</b>
+              </div>
+              <div class="mini-stat-card">
+                <span>Session Win Rate</span>
+                <b id="today-win-rate" class="monospace text-lg">0.0%</b>
+              </div>
+              <div class="mini-stat-card">
+                <span>Estimated Fees</span>
+                <b id="today-fees" class="monospace text-lg">₹0.00</b>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab Content 3: Lifetime -->
+          <div id="metrics-content-lifetime" class="tab-content" style="display: none;">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 0.75rem;">
+              <div class="mini-stat-card" style="grid-column: span 2;">
+                <span>Lifetime Net PnL</span>
+                <b id="lifetime-net-pnl" class="monospace text-xl text-green">₹0.00</b>
+              </div>
+              <div class="mini-stat-card">
+                <span>Lifetime Trades</span>
+                <b id="lifetime-total-trades" class="monospace text-lg">0</b>
+              </div>
+              <div class="mini-stat-card">
+                <span>Lifetime Win Rate</span>
+                <b id="lifetime-win-rate" class="monospace text-lg">0.0%</b>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SIGNAL SUPPRESSION -->
+        <div class="card glass-card">
+          <h2 class="card-title text-warning"><i data-lucide="bar-chart-3"></i> Opportunity Starvation & Suppressions</h2>
+          <div id="suppression-bottleneck-alert" class="alert-box-warning" style="display: none;">
+            <span><i data-lucide="alert-triangle"></i> Bottleneck: Score recommended: <b id="supp-rec-thresh">65</b>. Add. Trades: <b id="supp-add-trades">0</b>. Impact: <b id="supp-winrate-impact">--</b></span>
+          </div>
+          <div class="flex-between text-xs monospace" style="margin-top: 8px;">
+            <span>Candidates Evaluated:</span>
+            <b id="supp-total-candidates">0</b>
+          </div>
+          <div class="histogram-bars" style="display: flex; flex-direction: column; gap: 4px; margin-top: 10px;">
+            <div class="hist-row">
+              <span class="hist-label monospace text-xxs">TQS >= 70</span>
+              <div class="hist-bar-outer"><div id="bar-tqs-70" class="hist-bar-inner bg-blue" style="width: 0%"></div></div>
+              <span id="val-tqs-70" class="hist-val monospace text-xxs">0</span>
+            </div>
+            <div class="hist-row">
+              <span class="hist-label monospace text-xxs">TQS >= 75</span>
+              <div class="hist-bar-outer"><div id="bar-tqs-75" class="hist-bar-inner bg-green" style="width: 0%"></div></div>
+              <span id="val-tqs-75" class="hist-val monospace text-xxs">0</span>
+            </div>
+            <div class="hist-row">
+              <span class="hist-label monospace text-xxs">TQS >= 78</span>
+              <div class="hist-bar-outer"><div id="bar-tqs-78" class="hist-bar-inner bg-yellow" style="width: 0%"></div></div>
+              <span id="val-tqs-78" class="hist-val monospace text-xxs">0</span>
+            </div>
+            <div class="hist-row">
+              <span class="hist-label monospace text-xxs">TQS >= 80</span>
+              <div class="hist-bar-outer"><div id="bar-tqs-80" class="hist-bar-inner bg-purple" style="width: 0%"></div></div>
+              <span id="val-tqs-80" class="hist-val monospace text-xxs">0</span>
+            </div>
+            <div class="hist-row">
+              <span class="hist-label monospace text-xxs">TQS >= 85</span>
+              <div class="hist-bar-outer"><div id="bar-tqs-85" class="hist-bar-inner bg-red" style="width: 0%"></div></div>
+              <span id="val-tqs-85" class="hist-val monospace text-xxs">0</span>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- COLUMN 3: PORTFOLIO, EXPLAINER, AGENTS & TELEGRAM -->
+      <section class="grid-column">
+        
+        <!-- POSITION MONITOR (Phase 4) -->
+        <div class="card glass-card">
+          <h2 class="card-title"><i data-lucide="briefcase"></i> Active Positions</h2>
+          <div class="position-monitor-list" id="holdings-container">
+            <!-- Render positions with Entry -> Target progress bars dynamically -->
+            <p class="empty-table text-xs text-center py-4">No open positions. Quant engine ready.</p>
+          </div>
+          <table style="display: none;"><tbody id="holdings-table-body"></tbody></table> <!-- Hidden fallback element to satisfy old DOM updates -->
+        </div>
+
+        <!-- WHY WAS THIS TRADE TAKEN? (Phase 2) -->
+        <div class="card glass-card border-accent-purple">
+          <h2 class="card-title text-purple"><i data-lucide="help-circle"></i> Why Was This Trade Taken?</h2>
+          <p class="card-desc">Real-time reasoning, votes, and confidence explainer.</p>
+          
+          <div id="why-trade-explainer-content">
+            <div class="explainer-header flex-between">
+              <h3 id="explainer-symbol" class="text-xl font-bold">RELIANCE</h3>
+              <span id="explainer-decision" class="badge bg-green">BUY</span>
+            </div>
+            <div class="metrics-pill-row" style="display: flex; gap: 8px; margin-top: 10px;">
+              <span class="pill">TQS: <b id="explainer-tqs">86</b></span>
+              <span class="pill">Confidence: <b id="explainer-confidence">0.77</b></span>
+              <span class="pill">Risk: <b id="explainer-risk" class="text-green">PASS</b></span>
+              <span class="pill">Consensus: <b id="explainer-consensus">8/10</b></span>
+            </div>
+
+            <h4 class="section-subheading" style="margin-top: 14px; margin-bottom: 6px; font-size: 0.75rem; text-transform: uppercase;">Agent Vote Registry</h4>
+            <div class="votes-grid">
+              <div class="vote-item"><span>ML Model</span><b id="vote-ml">BUY</b></div>
+              <div class="vote-item"><span>Gemini</span><b id="vote-gemini">BUY</b></div>
+              <div class="vote-item"><span>Groq</span><b id="vote-groq">BUY</b></div>
+              <div class="vote-item"><span>Risk Manager</span><b id="vote-risk">BUY</b></div>
+              <div class="vote-item"><span>Context Engine</span><b id="vote-context">HOLD</b></div>
+              <div class="vote-item"><span>Breadth Engine</span><b id="vote-breadth">BUY</b></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI AGENT WAR ROOM (Phase 6) -->
+        <div class="card glass-card">
+          <h2 class="card-title"><i data-lucide="swords"></i> AI Agent War Room</h2>
+          <p class="card-desc">Multi-agent voting performance, PnL, and ranking metrics.</p>
+          <div class="war-room-table-wrapper">
+            <table class="diagnostic-table text-xs">
+              <thead>
+                <tr>
+                  <th>Agent</th>
+                  <th>Win Rate</th>
+                  <th>Vote</th>
+                  <th>PnL</th>
+                </tr>
+              </thead>
+              <tbody id="agent-war-room-body">
+                <tr class="agent-profitable">
+                  <td>ML Ensemble</td>
+                  <td>68%</td>
+                  <td class="font-semibold text-green">BUY</td>
+                  <td class="text-green">+₹2,840</td>
+                </tr>
+                <tr class="agent-neutral">
+                  <td>Gemini 2.0</td>
+                  <td>51%</td>
+                  <td class="font-semibold text-green">BUY</td>
+                  <td class="text-green">+₹820</td>
+                </tr>
+                <tr class="agent-losing">
+                  <td>Context</td>
+                  <td>39%</td>
+                  <td class="font-semibold text-yellow">HOLD</td>
+                  <td class="text-red">-₹380</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TELEGRAM AUDIT PANEL (Phase 5) -->
+        <div class="card glass-card">
+          <h2 class="card-title text-purple"><i data-lucide="send"></i> Telegram Audit Panel</h2>
+          <p class="card-desc">Click any notification to trace content payloads.</p>
+          <div class="telegram-audit-wrapper" style="max-height: 180px; overflow-y: auto;">
+            <table class="diagnostic-table text-xs">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="telegram-audit-body">
+                <tr>
+                  <td colspan="3" class="empty-table">No Telegram dispatches audited.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- BOTTOM SECTION: SYSTEM DIAGNOSTICS & REAL-TIME EVENT CONSOLE -->
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+      
+      <!-- REAL-TIME EVENT CONSOLE (Phase 1) -->
+      <section class="card glass-card event-console-card">
+        <div class="console-header flex-between" style="border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px; margin-bottom: 12px;">
+          <div>
+            <h2 class="card-title" style="margin-bottom: 2px;"><i data-lucide="terminal"></i> Event Console Log</h2>
+            <p class="card-desc" style="margin-bottom: 0;">Live streaming system signals, AI choices, trade reports and exceptions.</p>
+          </div>
+          
+          <div class="console-controls" style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" id="console-search" placeholder="Filter console log..." style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 10px; color: white; font-size: 0.75rem; width: 180px;">
+            <div class="console-filter-wrapper" style="position: relative;">
+              <select id="console-type-filter" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 10px; color: white; font-size: 0.75rem; cursor: pointer;">
+                <option value="ALL">All Events</option>
+                <option value="TRADE">Trade Events</option>
+                <option value="BUY">Buy Signals</option>
+                <option value="SELL">Sell Signals</option>
+                <option value="RISK">Risk Events</option>
+                <option value="CONSENSUS">Consensus Events</option>
+                <option value="SCANNER">Scanner Events</option>
+                <option value="AI">AI Decisions</option>
+                <option value="TELEGRAM">Telegram Events</option>
+                <option value="ERROR">Errors</option>
+                <option value="WARN">Warnings</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live streaming content -->
+        <div class="console-log-stream" id="console-log-stream">
+          <!-- Filled dynamically -->
+        </div>
+        
+        <!-- Hidden fallback element to satisfy old references -->
+        <div id="alerts-log-list" style="display: none;"></div>
+      </section>
+
+      <!-- SYSTEM DIAGNOSTICS & CHECKS -->
+      <section class="card glass-card">
+        <h2 class="card-title"><i data-lucide="cpu"></i> System Diagnostic Engine</h2>
+        <div class="metrics-tabs" style="display: flex; gap: 4px; margin-bottom: 12px; overflow-x: auto;">
+          <button class="tab-btn-diag active" id="tab-diag-market" onclick="switchCustomTab('diag', 'market')">Market</button>
+          <button class="tab-btn-diag" id="tab-diag-broker" onclick="switchCustomTab('diag', 'broker')">Broker</button>
+          <button class="tab-btn-diag" id="tab-diag-valid" onclick="switchCustomTab('diag', 'valid')">Ledger</button>
+          <button class="tab-btn-diag" id="tab-diag-scanner" onclick="switchCustomTab('diag', 'scanner')">Scanner</button>
+        </div>
+
+        <!-- Tab 1: Market -->
+        <div id="content-diag-market" class="tab-content-diag" style="display: block;">
+          <div class="debug-grid text-xs" style="display: grid; grid-template-columns: 1fr; gap: 8px;">
+            <div class="flex-between"><span>Provider:</span><b id="diag-data-provider">--</b></div>
+            <div class="flex-between"><span>Price TS:</span><b id="diag-price-timestamp">--</b></div>
+            <div class="flex-between"><span>Latency:</span><b id="diag-api-response-time">--</b></div>
+            <div class="flex-between"><span>Status:</span><b id="diag-market-status">--</b></div>
+            <div class="flex-between"><span>Source:</span><b id="diag-source-of-truth">--</b></div>
+            <div class="flex-between"><span>Mode:</span><b id="diag-mode">--</b></div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Broker -->
+        <div id="content-diag-broker" class="tab-content-diag" style="display: none;">
+          <div class="debug-grid text-xs" style="display: grid; grid-template-columns: 1fr; gap: 8px;">
+            <div class="flex-between"><span>Broker Mode:</span><b id="diag-broker-mode">--</b></div>
+            <div class="flex-between"><span>Active Broker:</span><b id="diag-active-broker">--</b></div>
+            <div class="flex-between"><span>Order Type:</span><b id="diag-trading-type">--</b></div>
+            <div class="flex-between"><span>Last Order ID:</span><b id="diag-last-order-id">--</b></div>
+            <div class="flex-between"><span>Exchange ID:</span><b id="diag-exchange-order-id">--</b></div>
+            <div class="flex-between"><span>Order Source:</span><b id="diag-order-source">--</b></div>
+            <div class="flex-between"><span>Execution:</span><b id="diag-execution-mode">--</b></div>
+            <div class="flex-between"><span>Product Type:</span><b id="diag-product-type">--</b></div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Ledger Validation -->
+        <div id="content-diag-valid" class="tab-content-diag" style="display: none;">
+          <div class="stats-subgrid text-xs" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div class="substat"><span>Total Trades</span><span id="val-total-trades">0</span></div>
+            <div class="substat"><span>Win Rate</span><span id="val-win-rate">0.0%</span></div>
+            <div class="substat"><span>Profit Factor</span><span id="val-profit-factor">1.00</span></div>
+            <div class="substat"><span>Sharpe Ratio</span><span id="val-sharpe">0.00</span></div>
+            <div class="substat"><span>Max Drawdown</span><span id="val-drawdown">0.0%</span></div>
+            <div class="substat"><span>Net P&L</span><span id="val-net-pnl">₹0.00</span></div>
+            <div class="substat"><span>Avg Winner</span><span id="val-avg-winner">₹0.00</span></div>
+            <div class="substat"><span>Avg Loser</span><span id="val-avg-loser">₹0.00</span></div>
+          </div>
+        </div>
+
+        <!-- Tab 4: Scanner -->
+        <div id="content-diag-scanner" class="tab-content-diag" style="display: none;">
+          <div class="debug-grid text-xs" style="display: grid; grid-template-columns: 1fr; gap: 8px;">
+            <div class="flex-between"><span>Current Scan:</span><b id="diag-scanner-current">--</b></div>
+            <div class="flex-between"><span>Current Session:</span><b id="diag-scanner-session">--</b></div>
+            <div class="flex-between"><span>Today Total:</span><b id="diag-scanner-today">--</b></div>
+            <div class="flex-between"><span>Lifetime Scanned:</span><b id="diag-scanner-lifetime">--</b></div>
+            <div class="flex-between"><span>Last Scan Time:</span><b id="diag-scanner-last-time">--</b></div>
+            <div class="flex-between"><span>Current Symbol:</span><b id="diag-scanner-current-symbol">--</b></div>
+            <div class="flex-between"><span>Symbols/Min:</span><b id="diag-scanner-speed">--</b></div>
+            <div class="flex-between"><span>Avg Scan Time:</span><b id="diag-scanner-avg-time">--</b></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Hidden element for Old premarket elements so that old updates don't break -->
+    <div id="pre-market-panel" style="display: none;">
+      <span id="pre-readiness-val"></span>
+      <span id="pre-countdown-label"></span>
+      <span id="pre-countdown-value"></span>
+      <span id="pre-status-system"></span>
+      <span id="pre-status-db"></span>
+      <span id="pre-status-ws"></span>
+      <span id="pre-status-agents"></span>
+      <span id="pre-status-broker"></span>
+      <span id="pre-status-scheduler"></span>
+      <span id="pre-status-market"></span>
+      <div id="pre-timeline-list"></div>
+    </div>
+
+    <!-- Hidden element to satisfy old prediction weight references -->
+    <div style="display: none;">
+      <span id="pred-signal"></span>
+      <span id="pred-stage"></span>
+      <span id="pred-consensus"></span>
+      <span id="pred-agent1-signal"></span>
+      <span id="pred-agent2-signal"></span>
+      <span id="pred-agent3-signal"></span>
+      <span id="pred-agent4-signal"></span>
+      <span id="pred-agent5-signal"></span>
+      <span id="pred-agent6-signal"></span>
+      <span id="pred-agent7-signal"></span>
+      <span id="pred-agent9-signal"></span>
+      <span id="pred-agent10-signal"></span>
+      <span id="pred-reasoning"></span>
+      <span id="weights-mix"></span>
+      <span id="weights-consensus-mix"></span>
+      <span id="weights-rsi-thresh"></span>
+      <span id="weights-adapts"></span>
+      <span id="val-accuracy"></span>
+      <span id="val-avg-holding"></span>
+      <span id="val-status-badge"></span>
+      <span id="opp-missed-profit"></span>
+      <span id="opp-saved-losses"></span>
+      <span id="opp-rejection-rate"></span>
+      <span id="readiness-score-value"></span>
+      <span id="readiness-badge"></span>
+      <div id="readiness-checklist"></div>
+      <tbody id="trades-table-body"></tbody>
+    </div>
+
+  </div>
+
+  <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+  <!-- Custom Switch Tab helper -->
+  <script>
+    window.switchCustomTab = function(groupName, tabName) {
+      document.querySelectorAll('.tab-content-' + groupName).forEach(function(el) {
+        el.style.display = 'none';
+      });
+      document.querySelectorAll('.tab-btn-' + groupName).forEach(function(el) {
+        el.style.background = 'rgba(255,255,255,0.04)';
+        el.style.color = 'var(--text-secondary)';
+        el.style.borderColor = 'rgba(255,255,255,0.1)';
+      });
+      const content = document.getElementById('content-' + groupName + '-' + tabName);
+      if (content) {
+        content.style.display = 'block';
+        const gridDiv = content.querySelector('.debug-grid, .stats-subgrid');
+        if (gridDiv) {
+          gridDiv.style.display = 'grid';
+        }
+      }
+      const btn = document.getElementById('tab-' + groupName + '-' + tabName);
+      if (btn) {
+        btn.style.background = 'var(--primary)';
+        btn.style.color = 'white';
+        btn.style.borderColor = 'var(--primary)';
+      }
+    };
+    window.toggleBackendSettings = function() {
+      const current = localStorage.getItem('BACKEND_URL') || '';
+      const val = prompt('Enter your Trading Backend URL (e.g. https://your-backend.onrender.com):', current);
+      if (val !== null) {
+        localStorage.setItem('BACKEND_URL', val.trim());
+        window.location.reload();
+      }
+    };
+  </script>
+  <script src="dashboard.js"></script>
+</body>
+</html>
