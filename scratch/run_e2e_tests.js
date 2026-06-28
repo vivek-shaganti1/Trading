@@ -40,7 +40,7 @@ tradingBot.getStatus = async () => {
   if (liveServerStatus) {
     return liveServerStatus;
   }
-  return await originalGetStatus();
+  return await originalGetStatus.call(tradingBot);
 };
 
 const telegramControl = require('../backend/telegramControl');

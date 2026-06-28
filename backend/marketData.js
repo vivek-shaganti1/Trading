@@ -12,6 +12,40 @@ const YAHOO_MAPPINGS = {
   'INFOSYS': 'INFY.NS'
 };
 
+// Response Caching Memory
+const responseCache = {};
+
+// Request Queueing / Throttling Memory
+const requestQueue = [];
+let isQueueProcessing = false;
+
+// Sequential request processor with a 200ms spacing gap
+function enqueueRequest(fetchFunction) {
+  return new Promise((resolve, reject) => {
+    requestQueue.push({ fetchFunction, resolve, reject });
+    processRequestQueue();
+  });
+}
+
+async function processRequestQueue() {
+  if (isQueueProcessing || requestQueue.length === 0) return;
+  isQueueProcessing = true;
+
+  while (requestQueue.length > 0) {
+    const { fetchFunction, resolve, reject } = requestQueue.shift();
+    try {
+      const result = await fetchFunction();
+      resolve(result);
+    } catch (err) {
+      reject(err);
+    }
+    // Rate limit safeguard spacing
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  isQueueProcessing = false;
+}
+
 const marketData = {
   // Returns active system mode: 'LIVE' or 'SIMULATOR'
   getMode() {
@@ -85,32 +119,70 @@ const marketData = {
 
       return { closes, highs, lows, volumes, source: 'SIMULATOR' };
     } else {
-      // LIVE mode: Query Yahoo Finance API
-      const yahooSymbol = symbol === 'NIFTY50_MINI' ? '^NSEI' : (symbol.endsWith('.NS') ? symbol : `${symbol}.NS`);
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=${interval}&range=${range}`;
-      
-      const startTime = Date.now();
-      try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Yahoo HTTP error: ${res.status}`);
-        const data = await res.json();
-        providerHealth.recordCall('Yahoo', startTime, true, '200 OK');
-        const quotes = data?.chart?.result?.[0]?.indicators?.quote?.[0] || {};
-        
-        const closes = (quotes.close || []).filter(c => c !== null && c !== undefined);
-        const highs = (quotes.high || []).filter(h => h !== null && h !== undefined);
-        const lows = (quotes.low || []).filter(l => l !== null && l !== undefined);
-        const volumes = (quotes.volume || []).filter(v => v !== null && v !== undefined);
+      // 1. Response Caching Layer (1-minute TTL to block redundant queries within the same tick)
+      const cacheKey = `${symbol}_${interval}_${range}`;
+      const cached = responseCache[cacheKey];
+      if (cached && (Date.now() - cached.timestamp < 60000)) {
+        return cached.data;
+      }
 
-        if (closes.length < 26) {
-          throw new Error(`Insufficient live historical points for interval ${interval} (need >= 26)`);
+      // 2. Fetcher execution wrapped inside Throttle Queue
+      const executionTask = async () => {
+        let attempts = 0;
+        const maxAttempts = 3;
+        let backoffDelay = 500;
+        let lastErr = null;
+
+        while (attempts < maxAttempts) {
+          attempts++;
+          // Alternate endpoints for provider abstraction / load balancing
+          const host = attempts % 2 === 1 ? 'query1.finance.yahoo.com' : 'query2.finance.yahoo.com';
+          const yahooSymbol = symbol === 'NIFTY50_MINI' ? '^NSEI' : (symbol.endsWith('.NS') ? symbol : `${symbol}.NS`);
+          const url = `https://${host}/v8/finance/chart/${yahooSymbol}?interval=${interval}&range=${range}`;
+          const startTime = Date.now();
+
+          try {
+            const res = await fetch(url);
+            if (res.status === 429) {
+              console.warn(`[MARKET DATA 429] Rate limited on ${host} for ${symbol}. Retrying in ${backoffDelay}ms...`);
+              await new Promise(r => setTimeout(r, backoffDelay));
+              backoffDelay *= 2;
+              continue;
+            }
+            if (!res.ok) throw new Error(`Yahoo HTTP error: ${res.status}`);
+
+            const data = await res.json();
+            providerHealth.recordCall('Yahoo', startTime, true, '200 OK');
+
+            const quotes = data?.chart?.result?.[0]?.indicators?.quote?.[0] || {};
+            const closes = (quotes.close || []).filter(c => c !== null && c !== undefined);
+            const highs = (quotes.high || []).filter(h => h !== null && h !== undefined);
+            const lows = (quotes.low || []).filter(l => l !== null && l !== undefined);
+            const volumes = (quotes.volume || []).filter(v => v !== null && v !== undefined);
+
+            if (closes.length < 26) {
+              throw new Error(`Insufficient live historical points for interval ${interval} (need >= 26)`);
+            }
+
+            const formattedResult = { closes, highs, lows, volumes, source: 'LIVE' };
+            // Cache the result
+            responseCache[cacheKey] = { timestamp: Date.now(), data: formattedResult };
+            return formattedResult;
+
+          } catch (err) {
+            lastErr = err;
+            providerHealth.recordCall('Yahoo', startTime, false, err.message);
+            // Exponential backoff delay
+            await new Promise(r => setTimeout(r, backoffDelay));
+            backoffDelay *= 2;
+          }
         }
 
-        return { closes, highs, lows, volumes, source: 'LIVE' };
-      } catch (err) {
-        providerHealth.recordCall('Yahoo', startTime, false, err.message);
-        throw new Error(`[MARKET DATA FAILURE] Failed to fetch live history for ${symbol} at interval ${interval}: ${err.message}`);
-      }
+        // If all attempts failed, throw to prevent silent simulated fallbacks
+        throw new Error(`Exhausted all live query endpoints for ${symbol}: ${lastErr.message}`);
+      };
+
+      return await enqueueRequest(executionTask);
     }
   },
 

@@ -460,10 +460,13 @@ const predictor = {
 
     const isVixHigh = pred5.indicators?.sp500Change < -1.0;
     const riskSignal = isVixHigh ? 'SELL' : 'BUY';
-    const pred7 = { signal: riskSignal, confidence: 0.85 };
+    const riskConfidence = Math.min(0.95, Math.max(0.40, 0.85 - Math.abs(pred5.indicators?.sp500Change || 0) * 0.1));
+    const pred7 = { signal: riskSignal, confidence: riskConfidence };
 
+    const usdChangeAbs = Math.abs(pred5.indicators?.usdinrChange || 0);
     const breadthSignal = pred5.indicators?.usdinrChange < 0.2 ? 'BUY' : 'SELL';
-    const pred9 = { signal: breadthSignal, confidence: 0.75 };
+    const breadthConfidence = Math.min(0.95, Math.max(0.40, 0.75 + (usdChangeAbs < 0.1 ? 0.15 : -0.1)));
+    const pred9 = { signal: breadthSignal, confidence: breadthConfidence };
 
     const volumeStateData = volumeIntelligenceAgent.analyzeVolume(candles5M);
     const pred10 = { signal: volumeStateData.volumeState === 'VOLUME_CLIMAX' || volumeStateData.volumeState === 'EXPANSION' ? 'BUY' : (volumeStateData.volumeState === 'DISTRIBUTION' ? 'SELL' : 'HOLD'), confidence: volumeStateData.volumeScore / 100 };

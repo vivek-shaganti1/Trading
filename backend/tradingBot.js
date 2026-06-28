@@ -11,6 +11,8 @@ const marketData = require('./marketData');
 const providerHealth = require('./providerHealth');
 const volumeIntelligenceAgent = require('./volumeIntelligenceAgent');
 
+const pendingExecutions = new Set();
+
 function getVoteBreakdown(prediction) {
   const breakdown = { BUY: 0, SELL: 0, HOLD: 0 };
   const agents = [
@@ -1157,6 +1159,27 @@ const tradingBot = {
           exitReason = 'Profit-Lock Hit';
         }
 
+        // 4. Strategy Exit: If live consensus signal reverses to SELL
+        if (!slHit && !targetHit) {
+          try {
+            const livePrediction = await predictor.getPrediction(pos.symbol, [currentPrice]);
+            if (livePrediction && livePrediction.signal === 'SELL') {
+              slHit = true;
+              exitReason = 'Strategy Exit (Consensus Reversed)';
+            }
+          } catch (e) {
+            console.warn(`[PORTFOLIO] Failed to run strategy exit check for ${pos.symbol}:`, e.message);
+          }
+        }
+
+        // 5. Time Exit: EOD Liquidation after 15:20 IST
+        const sysTime = getSystemTime();
+        const minsCheck = sysTime.hours * 60 + sysTime.minutes;
+        if (minsCheck >= 15 * 60 + 20) {
+          slHit = true;
+          exitReason = 'Time Exit (EOD Liquidation)';
+        }
+
         if (slHit || targetHit) {
           if (!exitReason) {
             exitReason = slHit ? 'Stop Loss Hit' : 'Profit Target Hit';
@@ -1592,7 +1615,7 @@ const tradingBot = {
     console.log(`[PORTFOLIO] Running Stage 3 Deep Analysis consensus on top 100 longs...`);
     for (const item of top100Longs) {
       // 1. One position per symbol check
-      if (activePositions.find(p => p.symbol === item.symbol)) {
+      if (activePositions.find(p => p.symbol === item.symbol) || pendingExecutions.has(item.symbol)) {
         rejectionReasons.already_held++;
         continue;
       }
@@ -2025,6 +2048,12 @@ const tradingBot = {
 
         const detailedReason = `Expectancy entry (${execMode} Mode): TQS ${tqs}%, allocation ${finalAllocationPct}% | REPORT: ${JSON.stringify(executionReport)}`;
 
+        if (pendingExecutions.has(item.symbol)) {
+          console.warn(`[PORTFOLIO] Order for ${item.symbol} is already in-flight. Skipping duplicate.`);
+          continue;
+        }
+        pendingExecutions.add(item.symbol);
+
         try {
           await agent17_execution.placeOrder(
             item.symbol,
@@ -2064,7 +2093,8 @@ const tradingBot = {
             `• Consensus Votes: <b>BUY ${buyCount} | SELL ${sellCount} | HOLD ${holdCount}</b>\n` +
             `• Confidence: <b>${(prediction.confidence * 100).toFixed(0)}%</b>`;
 
-          await alerts.sendTelegram(buyAlertText);        } catch (orderErr) {
+          await alerts.sendTelegram(buyAlertText);
+        } catch (orderErr) {
           console.error(`[ORDER EXECUTION FAILED] For ${item.symbol}:`, orderErr.message);
           if (orderErr.message.includes('CORRUPTION') || orderErr.message.includes('different source') || orderErr.message.includes('source mismatch')) {
             throw orderErr; // Halt execution!
@@ -2075,6 +2105,8 @@ const tradingBot = {
             data.orders_rejected_today = (data.orders_rejected_today || 0) + 1;
             db.writeLocalDb(data);
           } catch (e) {}
+        } finally {
+          pendingExecutions.delete(item.symbol);
         }
       }
     }
