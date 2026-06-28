@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const db = require('../db');
+const db = require('../backend/db');
 
 async function runAudit() {
   console.log('[AUDIT] Initializing 1,000 trades production validation audit...');

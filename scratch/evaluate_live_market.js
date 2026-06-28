@@ -1,5 +1,5 @@
 require('dotenv').config();
-const marketModel = require('../marketModel');
+const marketModel = require('../backend/marketModel');
 
 async function testLive() {
   console.log('🧪 Testing Production upgraded Agent 1 (marketModel) live inference...');

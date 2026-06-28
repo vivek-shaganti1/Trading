@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { Client } = require('pg');
-const marketModel = require('../marketModel');
+const marketModel = require('../backend/marketModel');
 
 async function auditAgent1() {
   const client = new Client({

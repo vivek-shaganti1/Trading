@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const db = require('../db');
-const predictor = require('../predictor');
+const db = require('../backend/db');
+const predictor = require('../backend/predictor');
 
 async function runTruthAudit() {
   console.log('🏁 INITIATING SYSTEM TRUTH AUDIT AND TELEMETRY RUN...');

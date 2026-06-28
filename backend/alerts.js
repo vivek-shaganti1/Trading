@@ -1,4 +1,4 @@
-const config = require('./config');
+const config = require('../shared/config');
 const db = require('./db');
 const providerHealth = require('./providerHealth');
 

@@ -1,6 +1,6 @@
-const db = require('../db');
-const broker = require('../broker');
-const config = require('../config');
+const db = require('../backend/db');
+const broker = require('../backend/broker');
+const config = require('../shared/config');
 
 async function runAudit() {
   console.log('🔄 INITIALIZING AUDIT ENGINE...');

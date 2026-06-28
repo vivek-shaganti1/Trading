@@ -2,7 +2,7 @@
  * Full Reset: Clean stale data from BOTH local db.json AND Postgres
  * This ensures a clean start with no stale holdings, halts, or inflated start_capital
  */
-const db = require('../db');
+const db = require('../backend/db');
 
 async function fullReset() {
   console.log('[FULL RESET] Waiting for DB initialization...');

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-const db = require('../db');
-const config = require('../config');
+const db = require('../backend/db');
+const config = require('../shared/config');
 
 (async () => {
   console.log('[RESET] Waiting for DB initialization...');

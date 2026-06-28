@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const db = require('../db');
-const broker = require('../broker');
+const db = require('../backend/db');
+const broker = require('../backend/broker');
 
 async function runAudit() {
   console.log('🔍 INITIATING DEPLOYMENT READINESS EVIDENCE GATHERING...');

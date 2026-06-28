@@ -1,6 +1,6 @@
 require('dotenv').config();
-const db = require('../db');
-const marketModel = require('../marketModel');
+const db = require('../backend/db');
+const marketModel = require('../backend/marketModel');
 const { Client } = require('pg');
 
 async function testPersistence() {

@@ -1,4 +1,4 @@
-const db = require('../db');
+const db = require('../backend/db');
 
 async function inspect() {
   await new Promise(r => setTimeout(r, 2000));

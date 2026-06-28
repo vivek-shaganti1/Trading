@@ -1,13 +1,13 @@
 const fs = require('fs');
 const path = require('path');
-const db = require('../db');
-const config = require('../config');
-const broker = require('../broker');
-const predictor = require('../predictor');
+const db = require('../backend/db');
+const config = require('../shared/config');
+const broker = require('../backend/broker');
+const predictor = require('../backend/predictor');
 const marketScanner = require('./market_scanner');
-const marketModel = require('../marketModel');
-const agent3_technicals = require('../agent3_technicals');
-const agent4_context = require('../agent4_context');
+const marketModel = require('../backend/marketModel');
+const agent3_technicals = require('../backend/agent3_technicals');
+const agent4_context = require('../backend/agent4_context');
 
 // Target Stocks + Live Global Asset for continuous 24/7 ticking proof
 const STOCKS = ['RELIANCE', 'INFY', 'TCS', 'SBIN', 'ADANIPORTS'];

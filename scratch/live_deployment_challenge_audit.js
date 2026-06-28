@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-const config = require('../config');
+const config = require('../shared/config');
 
 async function runChallengeAudit() {
   console.log('🏁 INITIATING LIVE DEPLOYMENT CHALLENGE AUDIT FROM NEON POSTGRESQL...');
@@ -146,7 +146,7 @@ async function runChallengeAudit() {
     // 3. Agent Attribution Validation
     // --------------------------------------------------
     console.log('3. AGENT ATTRIBUTION VALIDATION');
-    const predictor = require('../predictor');
+    const predictor = require('../backend/predictor');
     const leaderboard = predictor.getLeaderboard();
     await predictor.recalculateRealAttribution();
     const calibration = predictor.getAgentCalibration();

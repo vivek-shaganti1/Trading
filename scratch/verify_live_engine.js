@@ -5,13 +5,13 @@ process.env.DB_FILE = 'db_proof.json';
 
 const fs = require('fs');
 const path = require('path');
-const db = require('../db');
-const marketData = require('../marketData');
+const db = require('../backend/db');
+const marketData = require('../backend/marketData');
 const marketScanner = require('./market_scanner');
-const predictor = require('../predictor');
-const adaptiveDecisionEngine = require('../adaptiveDecisionEngine');
-const broker = require('../broker');
-const telegramControl = require('../telegramControl');
+const predictor = require('../backend/predictor');
+const adaptiveDecisionEngine = require('../backend/adaptiveDecisionEngine');
+const broker = require('../backend/broker');
+const telegramControl = require('../backend/telegramControl');
 const ws = require('ws');
 const http = require('http');
 

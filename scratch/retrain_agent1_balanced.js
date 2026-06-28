@@ -4,7 +4,7 @@ const path = require('path');
 const { DeeperNeuralNet } = require('./models');
 const { loadAllHistoricalData } = require('./data_loader');
 const { constructFeatures } = require('./feature_engineer');
-const db = require('../db');
+const db = require('../backend/db');
 
 function calculateMetrics(preds, targets) {
   const classes = ['BUY', 'SELL', 'HOLD'];

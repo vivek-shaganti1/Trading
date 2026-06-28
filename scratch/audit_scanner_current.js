@@ -1,5 +1,5 @@
-const db = require('../db');
-const predictor = require('../predictor');
+const db = require('../backend/db');
+const predictor = require('../backend/predictor');
 
 async function runAudit() {
   console.log('🔍 RUNNING LIVE SCANNED CANDIDATES AUDIT...');

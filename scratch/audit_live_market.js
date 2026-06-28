@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { Client } = require('pg');
-const db = require('../db');
-const predictor = require('../predictor');
+const db = require('../backend/db');
+const predictor = require('../backend/predictor');
 
 async function runLiveAudit() {
   console.log('🏁 INITIATING LIVE MARKET DEBUG AUDIT...');

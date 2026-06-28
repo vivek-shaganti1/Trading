@@ -1,8 +1,8 @@
 // 1,000 Trades Production Validation Runner
 const fs = require('fs');
 const path = require('path');
-const db = require('../db');
-const predictor = require('../predictor');
+const db = require('../backend/db');
+const predictor = require('../backend/predictor');
 
 async function runValidation() {
   console.log('========================================================================');

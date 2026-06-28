@@ -1,5 +1,5 @@
 require('dotenv').config();
-const config = require('../config');
+const config = require('../shared/config');
 
 async function listModels() {
   const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${config.GEMINI_API_KEY}`;

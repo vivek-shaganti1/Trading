@@ -1,5 +1,5 @@
-const db = require('../db');
-const backtest = require('../backtestEngine');
+const db = require('../backend/db');
+const backtest = require('../backend/backtestEngine');
 
 async function runAll() {
   console.log("Initializing database connection...");

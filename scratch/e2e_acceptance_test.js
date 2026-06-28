@@ -75,7 +75,7 @@ async function runTest() {
   console.log('[E2E] 4. Testing Telegram Controller /status...');
   let tgOk = false;
   try {
-    const telegramControl = require('../telegramControl');
+    const telegramControl = require('../backend/telegramControl');
     const response = await telegramControl.handleTelegramMessage('/status', 12345);
     console.log('[E2E] Telegram Response:\n', response);
     if (response && response.includes('Quant Command Station Status')) {
@@ -90,7 +90,7 @@ async function runTest() {
   console.log('[E2E] 5. Validating scheduler time boundary filters...');
   let schedulerOk = false;
   try {
-    const tradingBot = require('../tradingBot');
+    const tradingBot = require('../backend/tradingBot');
     const timeOpen = { hours: 10, minutes: 0, day: 1, dateStr: '2026-06-26' };
     const timeClosed = { hours: 16, minutes: 0, day: 1, dateStr: '2026-06-26' };
     const timeWeekend = { hours: 10, minutes: 0, day: 6, dateStr: '2026-06-27' };

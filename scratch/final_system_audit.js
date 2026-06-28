@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const db = require('../db');
+const db = require('../backend/db');
 
 // Representative list of 200 stocks to simulate universe scanning in Phase 4
 const universeSectors = ['IT', 'BANKING', 'ENERGY', 'FMCG', 'AUTO', 'PHARMA', 'METALS', 'INFRASTRUCTURE', 'TELECOM', 'FINANCE'];

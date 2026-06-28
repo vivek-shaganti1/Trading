@@ -2,7 +2,8 @@
   "version": 2,
   "cleanUrls": true,
   "routes": [
-    { "src": "/trade-analysis", "dest": "/trade-analysis.html" },
-    { "handle": "filesystem" }
+    { "src": "/trade-analysis", "dest": "/frontend/trade-analysis.html" },
+    { "src": "/(index\\.html)?", "dest": "/frontend/index.html" },
+    { "src": "/(.*)", "dest": "/frontend/$1" }
   ]
 }

@@ -1,5 +1,5 @@
 require('dotenv').config();
-const db = require('../db');
+const db = require('../backend/db');
 
 function generateSyntheticLogs() {
   console.log('⚠️ Database has sparse history. Generating 100 synthetic prediction logs with simulated disagreements...');

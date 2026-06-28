@@ -1,5 +1,5 @@
 const http = require('http');
-const db = require('../db');
+const db = require('../backend/db');
 
 function fetchStatus() {
   return new Promise((resolve, reject) => {

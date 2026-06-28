@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const db = require('./db');
-const config = require('./config');
+const config = require('../shared/config');
 const marketData = require('./marketData');
 
 // Yahoo Finance Mappings

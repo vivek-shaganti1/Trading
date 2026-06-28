@@ -1,6 +1,6 @@
-const tradingBot = require('../tradingBot');
-const db = require('../db');
-const predictor = require('../predictor');
+const tradingBot = require('../backend/tradingBot');
+const db = require('../backend/db');
+const predictor = require('../backend/predictor');
 
 async function runSimulation() {
   console.log('🏁 INITIATING MARKET OPEN WORKFLOW SIMULATION...');

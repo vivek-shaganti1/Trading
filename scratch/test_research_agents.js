@@ -1,6 +1,6 @@
-const db = require('../db');
-const agentResearch = require('../agentResearch');
-const predictor = require('../predictor');
+const db = require('../backend/db');
+const agentResearch = require('../backend/agentResearch');
+const predictor = require('../backend/predictor');
 const fs = require('fs');
 const path = require('path');
 

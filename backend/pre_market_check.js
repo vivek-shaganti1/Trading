@@ -1,9 +1,9 @@
 require('dotenv').config();
 const db = require('./db');
-const config = require('./config');
+const config = require('../shared/config');
 const broker = require('./broker');
 const predictor = require('./predictor');
-const marketScanner = require('./scratch/market_scanner');
+const marketScanner = require('../scratch/market_scanner');
 const agent17_execution = require('./agent17_execution');
 const alerts = require('./alerts');
 const { Client } = require('pg');

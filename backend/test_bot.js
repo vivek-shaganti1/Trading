@@ -2,7 +2,7 @@ process.env.DB_FILE = 'db_test.json';
 const db = require('./db');
 const broker = require('./broker');
 const tradingBot = require('./tradingBot');
-const config = require('./config');
+const config = require('../shared/config');
 
 async function runTests() {
   console.log('🧪 Starting Automated Core System Verification...');

@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
-const config = require('../config');
+const config = require('../shared/config');
 
 async function clean() {
   console.log('🧹 CLEARING MOCK AGENT ENTRIES...');

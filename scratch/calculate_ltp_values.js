@@ -1,6 +1,6 @@
-const db = require('../db');
-const marketData = require('../marketData');
-const broker = require('../broker');
+const db = require('../backend/db');
+const marketData = require('../backend/marketData');
+const broker = require('../backend/broker');
 
 async function run() {
   await db.initPromise;

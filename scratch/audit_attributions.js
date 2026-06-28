@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-const config = require('../config');
+const config = require('../shared/config');
 
 async function auditAttributions() {
   console.log('🏁 INITIATING AGENT ATTRIBUTION FORENSIC AUDIT...');

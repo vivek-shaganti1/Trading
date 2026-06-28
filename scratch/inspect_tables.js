@@ -1,4 +1,4 @@
-const db = require('../db');
+const db = require('../backend/db');
 
 (async () => {
   await db.initPromise;

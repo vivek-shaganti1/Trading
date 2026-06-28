@@ -1,5 +1,5 @@
 const { Client } = require('pg');
-const config = require('../config');
+const config = require('../shared/config');
 
 async function runEmergencyAudit() {
   console.log('🏁 INITIATING EMERGENCY MARKET OPEN FORENSIC AUDIT...');

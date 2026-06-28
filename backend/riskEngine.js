@@ -1,6 +1,6 @@
 // Advanced Sizing & Portfolio Risk Engine (Phase 19 Upgrade)
 const db = require('./db');
-const config = require('./config');
+const config = require('../shared/config');
 
 const riskEngine = {
   // Check if target transaction complies with risk metrics and calculate dynamic sizing

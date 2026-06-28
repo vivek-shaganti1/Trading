@@ -5,7 +5,7 @@ const { DeeperNeuralNet, GradientBoostedTrees, RandomForest } = require('./model
 const { loadAllHistoricalData } = require('./data_loader');
 const { constructFeatures } = require('./feature_engineer');
 const { runBacktest, calculateAlphaMetrics } = require('./backtester');
-const db = require('../db');
+const db = require('../backend/db');
 
 // 1. Generate 100 Synthetic Market Scenarios (10 vectors per scenario type)
 function generateSyntheticScenarios() {

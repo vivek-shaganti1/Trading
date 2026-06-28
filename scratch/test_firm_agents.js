@@ -1,6 +1,6 @@
-const db = require('../db');
-const agentFirm = require('../agentFirm');
-const predictor = require('../predictor');
+const db = require('../backend/db');
+const agentFirm = require('../backend/agentFirm');
+const predictor = require('../backend/predictor');
 
 async function testE2E() {
   console.log('🧪 RUNNING DRY-RUN FIRM AGENTS VALIDATION...');

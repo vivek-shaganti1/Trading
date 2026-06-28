@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
-const config = require('../config');
-const db = require('../db');
+const config = require('../shared/config');
+const db = require('../backend/db');
 
 async function runDatabaseAudit() {
   console.log('📊 INITIATING LIVE DATABASE EVIDENCE AUDIT...');

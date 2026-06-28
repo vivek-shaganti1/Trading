@@ -13,7 +13,7 @@
  * Usage:  node scratch/clean_stale_data.js
  */
 
-const db = require('../db');
+const db = require('../backend/db');
 
 const SYNTHETIC_RE = /^(STRTECH|TELE|TEXT|ENER|SERV|INDU)\d*$/;
 

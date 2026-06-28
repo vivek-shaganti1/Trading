@@ -1,7 +1,7 @@
-const db = require('../db');
-const predictor = require('../predictor');
-const config = require('../config');
-const broker = require('../broker');
+const db = require('../backend/db');
+const predictor = require('../backend/predictor');
+const config = require('../shared/config');
+const broker = require('../backend/broker');
 
 async function generateV6Report() {
   console.log('🏁 INITIATING V6 OPPORTUNITY THROUGHPUT & EXECUTION AUDIT...');

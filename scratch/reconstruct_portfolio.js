@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { Client } = require('pg');
-const broker = require('../broker');
+const broker = require('../backend/broker');
 
 async function reconstruct() {
   const client = new Client({

@@ -1,6 +1,6 @@
 require('dotenv').config();
-const predictor = require('../predictor');
-const config = require('../config');
+const predictor = require('../backend/predictor');
+const config = require('../shared/config');
 
 // Helper to back up keys
 const origGeminiKey = config.GEMINI_API_KEY;

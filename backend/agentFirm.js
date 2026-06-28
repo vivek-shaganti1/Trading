@@ -1,6 +1,6 @@
 const db = require('./db');
 const predictor = require('./predictor');
-const config = require('./config');
+const config = require('../shared/config');
 
 const agentFirm = {
   // Agent 20: Performance Analyst

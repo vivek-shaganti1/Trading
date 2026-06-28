@@ -6,7 +6,7 @@
  * rejections, audits, and sets balance to ₹12,000.
  */
 
-const db = require('../db');
+const db = require('../backend/db');
 
 (async () => {
   console.log('[RESET] Waiting for database connection initialization...');

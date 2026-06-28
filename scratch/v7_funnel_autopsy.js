@@ -2,8 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
 require('dotenv').config();
-const db = require('../db');
-const predictor = require('../predictor');
+const db = require('../backend/db');
+const predictor = require('../backend/predictor');
 
 async function runAutopsy() {
   await db.initPromise;

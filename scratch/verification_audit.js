@@ -1,7 +1,7 @@
-const db = require('../db');
-const predictor = require('../predictor');
-const dynamicThreshold = require('../dynamicThreshold');
-const agentResearch = require('../agentResearch');
+const db = require('../backend/db');
+const predictor = require('../backend/predictor');
+const dynamicThreshold = require('../backend/dynamicThreshold');
+const agentResearch = require('../backend/agentResearch');
 
 async function run() {
   console.log("=== POST-IMPLEMENTATION VERIFICATION DATA ===");

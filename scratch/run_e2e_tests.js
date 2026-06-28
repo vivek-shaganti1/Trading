@@ -4,9 +4,9 @@ const path = require('path');
 const fs = require('fs');
 
 // Mock dependencies of telegramControl to avoid database corruption and double tick loops
-const db = require('../db');
-const tradingBot = require('../tradingBot');
-const broker = require('../broker');
+const db = require('../backend/db');
+const tradingBot = require('../backend/tradingBot');
+const broker = require('../backend/broker');
 
 // Save original methods
 const originalLogTelegramCommand = db.logTelegramCommand;
@@ -43,7 +43,7 @@ tradingBot.getStatus = async () => {
   return await originalGetStatus();
 };
 
-const telegramControl = require('../telegramControl');
+const telegramControl = require('../backend/telegramControl');
 
 const results = {
   passed: 0,
@@ -264,7 +264,7 @@ async function runAllTests() {
   // --- PHASE 3: PORTFOLIO & RESET VERIFICATION ---
   console.log('\n--- PHASE 3: PORTFOLIO & RESET VERIFICATION ---');
   try {
-    const configModule = require('../config');
+    const configModule = require('../shared/config');
     const res = await makeRequest('POST', '/api/admin/reset', { password: configModule.ADMIN_RESET_PASSWORD });
     if (res.status === 200) {
       logTest('POST /api/admin/reset Execution', 'PASS', 'Bot admin reset executed successfully.');

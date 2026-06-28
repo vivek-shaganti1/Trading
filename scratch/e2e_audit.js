@@ -1,8 +1,8 @@
 require('dotenv').config();
-const db = require('../db');
-const predictor = require('../predictor');
-const broker = require('../broker');
-const alerts = require('../alerts');
+const db = require('../backend/db');
+const predictor = require('../backend/predictor');
+const broker = require('../backend/broker');
+const alerts = require('../backend/alerts');
 const { Client } = require('pg');
 
 async function runAudit() {

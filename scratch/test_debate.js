@@ -1,7 +1,7 @@
 require('dotenv').config();
-const db = require('../db');
-const predictor = require('../predictor');
-const broker = require('../broker');
+const db = require('../backend/db');
+const predictor = require('../backend/predictor');
+const broker = require('../backend/broker');
 
 async function testDebate() {
   console.log('🧪 Testing Prediction Intelligence and Debate Console formatting...\n');

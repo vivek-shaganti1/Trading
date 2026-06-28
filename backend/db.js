@@ -1,10 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
-const config = require('./config');
+const config = require('../shared/config');
 const providerHealth = require('./providerHealth');
 
-const DB_FILE = path.join(__dirname, process.env.DB_FILE || 'db.json');
+const DB_FILE = path.join(__dirname, '..', process.env.DB_FILE || 'db.json');
 
 let pool = null;
 let dbAvailable = false;

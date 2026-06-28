@@ -1,9 +1,9 @@
 const fs = require('fs');
 const path = require('path');
-const db = require('../db');
-const alerts = require('../alerts');
-const broker = require('../broker');
-const tradingBot = require('../tradingBot');
+const db = require('../backend/db');
+const alerts = require('../backend/alerts');
+const broker = require('../backend/broker');
+const tradingBot = require('../backend/tradingBot');
 
 async function runReadinessTest() {
   console.log('========================================================================');

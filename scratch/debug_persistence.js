@@ -1,5 +1,5 @@
 require('dotenv').config();
-const db = require('../db');
+const db = require('../backend/db');
 
 async function debugPersist() {
   console.log('1. Fetching portfolio state...');

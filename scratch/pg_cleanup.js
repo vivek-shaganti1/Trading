@@ -1,7 +1,7 @@
 /**
  * Postgres Cleanup: Sync clean local state to Postgres via public db API
  */
-const db = require('../db');
+const db = require('../backend/db');
 
 async function pgCleanup() {
   console.log('[PG CLEANUP] Waiting for DB initialization...');

@@ -1,5 +1,5 @@
-const predictor = require('../predictor');
-const broker = require('../broker');
+const predictor = require('../backend/predictor');
+const broker = require('../backend/broker');
 
 async function test() {
   const symbol = 'ADANIPORTS';

@@ -1,5 +1,5 @@
-const db = require('../db');
-const tradingBot = require('../tradingBot');
+const db = require('../backend/db');
+const tradingBot = require('../backend/tradingBot');
 
 (async () => {
   await db.initPromise;

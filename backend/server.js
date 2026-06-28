@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
-const config = require('./config');
+const config = require('../shared/config');
 
 // Startup Configuration Validation
 function validateConfig() {
@@ -95,10 +95,10 @@ app.use((req, res, next) => {
 });
 
 // Serve static dashboard files
-app.use(express.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 app.get('/trade-analysis', (req, res) => {
-  res.sendFile(path.join(__dirname, 'trade-analysis.html'));
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'trade-analysis.html'));
 });
 
 app.get('/favicon.ico', (req, res) => res.status(204).end());

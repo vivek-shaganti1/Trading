@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { Client } = require('pg');
-const predictor = require('../predictor');
+const predictor = require('../backend/predictor');
 
 async function audit() {
   const client = new Client({

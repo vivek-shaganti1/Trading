@@ -1,8 +1,8 @@
-const tradingBot = require('../tradingBot');
-const db = require('../db');
-const predictor = require('../predictor');
-const broker = require('../broker');
-const config = require('../config');
+const tradingBot = require('../backend/tradingBot');
+const db = require('../backend/db');
+const predictor = require('../backend/predictor');
+const broker = require('../backend/broker');
+const config = require('../shared/config');
 
 async function testLifecycle() {
   console.log('🚀 STARTING COMPLETED TRADES FULL LIFECYCLE VERIFICATION AUDIT...');

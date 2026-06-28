@@ -1,6 +1,6 @@
 const http = require('http');
 const WebSocket = require('ws');
-const db = require('../db');
+const db = require('../backend/db');
 
 function fetchAPI(path) {
   return new Promise((resolve) => {

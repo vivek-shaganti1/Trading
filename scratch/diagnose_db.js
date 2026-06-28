@@ -1,4 +1,4 @@
-const db = require('../db');
+const db = require('../backend/db');
 
 async function main() {
   console.log('--- STARTING CONCISE FINANCIAL FORENSIC CHECK (NO NESTED ARRAYS) ---');

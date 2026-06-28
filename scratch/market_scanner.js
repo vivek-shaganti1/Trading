@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const db = require('../db');
-const config = require('../config');
-const marketData = require('../marketData');
+const db = require('../backend/db');
+const config = require('../shared/config');
+const marketData = require('../backend/marketData');
 
 // Fallback universe (Nifty 50 constituents) to prevent startup crashes if json is missing
 const FALLBACK_UNIVERSE = [

@@ -1,5 +1,5 @@
 require('dotenv').config();
-const config = require('../config');
+const config = require('../shared/config');
 
 async function auditGemini() {
   console.log('--- GEMINI INTEGRATION AUDIT ---');

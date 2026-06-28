@@ -1,5 +1,5 @@
-const db = require('../db');
-const tb = require('../tradingBot');
+const db = require('../backend/db');
+const tb = require('../backend/tradingBot');
 
 async function run() {
   console.log('=== SECTION 5 — RESTART TEST ===');
@@ -23,7 +23,7 @@ async function run() {
   console.log('Triggering finalizeMarketDay...');
   
   // Intercept alerts.sendTelegram to confirm if any message is sent
-  const alerts = require('../alerts');
+  const alerts = require('../backend/alerts');
   let messageSent = false;
   const originalSend = alerts.sendTelegram;
   alerts.sendTelegram = async (msg) => {

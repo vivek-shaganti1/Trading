@@ -1,7 +1,7 @@
-const db = require('../db');
-const broker = require('../broker');
-const agent17_execution = require('../agent17_execution');
-const alerts = require('../alerts');
+const db = require('../backend/db');
+const broker = require('../backend/broker');
+const agent17_execution = require('../backend/agent17_execution');
+const alerts = require('../backend/alerts');
 
 async function testLiveTradeLifecycle() {
   console.log('🏁 INITIATING LIVE TRADE LIFECYCLE AUDIT (TEST 2 & 3)...');
