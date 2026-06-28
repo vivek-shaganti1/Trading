@@ -137,8 +137,8 @@ function calculateBayesianConfidence({
     Math.min(0.98, parseFloat((posteriorWinProbability + marginOfError).toFixed(4)))
   ];
 
-  // 5. Expected Win Probability (smoothed with prior)
-  const weight = Math.min(0.7, stats.sampleSize / 30); // rely more on posterior as sample size grows
+  // 5. Expected Win Probability (smoothed with prior, minimum 0.4 weight on live posterior metrics)
+  const weight = Math.max(0.4, Math.min(0.8, stats.sampleSize / 30)); 
   const expectedWinProbability = (posteriorWinProbability * weight) + (priorWinRate * (1 - weight));
 
   // 6. Expected R Multiple (Expectancy)

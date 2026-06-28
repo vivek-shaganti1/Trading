@@ -21,16 +21,18 @@ async function testLifecycle() {
   dbData.daily_stats = []; // Clear daily stats
   db.writeLocalDb(dbData);
 
-  // Set mock time to premarket open first (09:00) to initialize daily stats cleanly
-  tradingBot._setMockTime({
-    hours: 9,
-    minutes: 0,
-    seconds: 0,
-    dateStr: '2026-06-12',
-    day: 1
-  });
-  
-  await tradingBot.tick(); // Run premarket warmup which resets daily stats
+  // Override scanner to return only ASIANPAINT for instant execution
+  const marketScanner = require('./market_scanner');
+  const originalScanUniverse = marketScanner.scanUniverse;
+  marketScanner.scanUniverse = async function() {
+    return {
+      longs: [
+        { symbol: 'ASIANPAINT', price: 3000.00, score: 4.5, rank: 1, volumeScore: 80, trendScore: 90 }
+      ],
+      shorts: [],
+      sectorAverages: {}
+    };
+  };
 
   // Override prediction and scanner for ASIANPAINT
   const originalGetPrediction = predictor.getPrediction;
@@ -38,10 +40,14 @@ async function testLifecycle() {
     if (symbol === 'ASIANPAINT') {
       return {
         consensus: true,
+        execute: true,
+        grade: 'A+',
         tradeQuality: 90,
         signal: 'BUY',
         confidence: 0.85,
         expectancyBeforeTrade: 0.95,
+        stopLossPrice: 2950.00,
+        targetPrice: 3090.00,
         participating_models: {
           agent1: { signal: 'BUY', confidence: 0.85 },
           agent4_technical: { signal: 'BUY', confidence: 0.85 },
@@ -68,6 +74,29 @@ async function testLifecycle() {
     }
     return originalGetLTP.call(broker, symbol);
   };
+
+  const originalGetBid = broker.getBid;
+  broker.getBid = function(symbol) {
+    if (symbol === 'ASIANPAINT') return mockLtp - 1.00;
+    return originalGetBid.call(broker, symbol);
+  };
+
+  const originalGetAsk = broker.getAsk;
+  broker.getAsk = function(symbol) {
+    if (symbol === 'ASIANPAINT') return mockLtp + 1.00;
+    return originalGetAsk.call(broker, symbol);
+  };
+
+  // Set mock time to premarket open first (09:00) to initialize daily stats cleanly
+  tradingBot._setMockTime({
+    hours: 9,
+    minutes: 0,
+    seconds: 0,
+    dateStr: '2026-06-12',
+    day: 1
+  });
+  
+  await tradingBot.tick(); // Run premarket warmup which resets daily stats
 
   // Set mock time to market hours (09:16)
   tradingBot._setMockTime({
@@ -168,6 +197,9 @@ async function testLifecycle() {
   predictor.getPrediction = originalGetPrediction;
   broker.getUniversePriceData = originalGetUniverse;
   broker.getLTP = originalGetLTP;
+  broker.getBid = originalGetBid;
+  broker.getAsk = originalGetAsk;
+  marketScanner.scanUniverse = originalScanUniverse;
   
   process.exit(0);
 }

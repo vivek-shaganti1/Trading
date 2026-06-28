@@ -46,15 +46,15 @@ function calculateICS({
   // Round final score
   let finalScore = Math.max(0, Math.min(100, Math.round(score)));
 
-  // Label interpretation mapping
+  // Label interpretation mapping aligned with Adaptive Decision Engine Grades
   let label = 'Reject';
-  if (finalScore >= 90) {
+  if (finalScore >= 80) {
     label = 'Strong Buy';
-  } else if (finalScore >= 80) {
-    label = 'Buy';
   } else if (finalScore >= 70) {
-    label = 'Watch';
+    label = 'Buy';
   } else if (finalScore >= 60) {
+    label = 'Watch';
+  } else if (finalScore >= 50) {
     label = 'Weak';
   } else {
     label = 'Reject';

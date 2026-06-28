@@ -78,7 +78,7 @@ async function callGemini(symbol, ltp, pred1, pred4, pred5) {
   const startTime = Date.now();
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -166,7 +166,7 @@ async function callGroq(symbol, ltp, pred1, pred4, pred5) {
   const startTime = Date.now();
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -720,30 +720,6 @@ const predictor = {
     const finalConfidence = bayesianResult.expectedWinProbability;
     const finalExpectancy = bayesianResult.expectedR;
 
-    const baseTqs = Math.round(
-      (candleScore * 0.25) +
-      (smcScore * 0.20) +
-      (volumeScore * 0.15) +
-      (structureScore * 0.15) +
-      (regimeScore * 0.10) +
-      (rrScore * 0.10) +
-      (expectancyScore * 0.05)
-    );
-    let finalTqs = Math.round(baseTqs * (0.7 + 0.3 * setupConviction));
-
-    // Agent 26 Memory Engine Hook: Retrieve similarity matching
-    let analogAdj = { confidence_adj: 0, match_count: 0 };
-    try {
-      const agentResearch = require('./agentResearch');
-      analogAdj = await agentResearch.findAnalogAdjustments(symbol, featureVector);
-      if (analogAdj.confidence_adj !== 0) {
-        const adjScore = Math.round(analogAdj.confidence_adj * 100);
-        finalTqs = Math.max(0, Math.min(100, finalTqs + adjScore));
-      }
-    } catch (memErr) {
-      console.error('[AGENT 26] Failed to calculate memory analog updates:', memErr.message);
-    }
-
     // Determine Direction
     let direction = primarySignal;
 
@@ -789,6 +765,22 @@ const predictor = {
 
     const decision = adaptiveDecisionEngine.evaluateDecision(symbol, direction, decisionInputs);
     let finalSignal = decision.execute ? direction : 'HOLD';
+
+    const baseTqs = decision.score;
+    let finalTqs = Math.round(baseTqs * (0.7 + 0.3 * setupConviction));
+
+    // Agent 26 Memory Engine Hook: Retrieve similarity matching
+    let analogAdj = { confidence_adj: 0, match_count: 0 };
+    try {
+      const agentResearch = require('./agentResearch');
+      analogAdj = await agentResearch.findAnalogAdjustments(symbol, featureVector);
+      if (analogAdj.confidence_adj !== 0) {
+        const adjScore = Math.round(analogAdj.confidence_adj * 100);
+        finalTqs = Math.max(0, Math.min(100, finalTqs + adjScore));
+      }
+    } catch (memErr) {
+      console.error('[AGENT 26] Failed to calculate memory analog updates:', memErr.message);
+    }
 
     // Diagnostic logging — shows exactly why each candidate passes/fails
     console.log(`[DECISION] ${symbol} | Dir=${direction} | Score=${decision.score}/70 | Grade=${decision.grade} | Execute=${decision.execute} | Pattern=${candlePattern}(${candleScore}) | Structure=${structureScore} | Vol=${volumeScore} | SMC=${smcScore} | RR=${rrVal.toFixed(1)} | BuyW=${buyWeight.toFixed(2)} BuyC=${buyConfidence.toFixed(2)} | Rejections: ${decision.rejections.length > 0 ? decision.rejections.join('; ') : 'NONE'}`);

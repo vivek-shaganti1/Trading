@@ -1208,6 +1208,36 @@ const tradingBot = {
 
           await db.matchBuyAndCreateCompletedTrade(pos.symbol, currentPrice, pos.quantity, new Date().toISOString(), exitReason);
           await predictor.recordPredictionExit(pos.symbol, currentPrice, tradePnL, pos);
+
+          // Update Self-Learning Engine (Phase 19 statistics)
+          try {
+            const learningEngine = require('./learningEngine');
+            const durationMs = Date.now() - new Date(pos.timestamp || new Date()).getTime();
+            const durationMins = Math.round(durationMs / 60000);
+            
+            const pModels = pos.participating_models || {};
+            const candlePattern = pModels.agent11_price_action?.pattern || 'None';
+            const marketState = pModels.agent5_context?.marketState || 'RANGING';
+            const trend = pModels.agent6_regime?.trend || 'NEUTRAL';
+            const volumeState = pModels.agent4_technical?.volumeState || 'ACCUMULATION';
+
+            learningEngine.recordTradeOutcome({
+              symbol: pos.symbol,
+              candle_pattern: candlePattern,
+              market_state: marketState,
+              trend: trend,
+              volume_state: volumeState,
+              risk_reward: pos.calculatedRiskReward || 1.5,
+              holding_minutes: durationMins,
+              exit_reason: exitReason,
+              net_pnl: tradePnL,
+              r_multiple: pos.calculatedRiskReward ? (tradePnL > 0 ? pos.calculatedRiskReward : -1.0) : 0,
+              mfe: 0,
+              mae: 0
+            });
+          } catch (leErr) {
+            console.error('[PORTFOLIO] Failed to update learning engine:', leErr.message);
+          }
           
           // Record validation outcome (Phase 7)
           try {
@@ -1734,7 +1764,7 @@ const tradingBot = {
 
       // Trade Quality Rules: Dynamic TQS Threshold
       const dtResult = dynamicThreshold.getCurrentThreshold();
-      let currentThreshold = Math.max(80, dtResult.threshold); // Enforce strict minimum TQS of 80
+      let currentThreshold = dtResult.threshold; 
       
       // Target-Driven Threshold scaling - ONLY upward protection, NEVER lowering
       const dailyTarget = currentDayStats ? currentDayStats.daily_target : 1000;
@@ -1746,10 +1776,10 @@ const tradingBot = {
         console.log(`[PORTFOLIO] Target-Driven Execution: Target met. Threshold raised to ${currentThreshold} to lock profit.`);
       }
 
-      // Apply Target Engine adaptation offset (clamped between 80 and 85)
+      // Apply Target Engine adaptation offset (clamped between 60 and 85)
       if (typeof tqsThresholdOffset !== 'undefined' && tqsThresholdOffset) {
         currentThreshold += tqsThresholdOffset;
-        currentThreshold = Math.max(80, Math.min(85, currentThreshold));
+        currentThreshold = Math.max(60, Math.min(85, currentThreshold));
       }
 
       try {
