@@ -31,3 +31,5 @@ Thumbs.db
 .agents/
 .vscode/
 .idea/
+.vercel
+.env*

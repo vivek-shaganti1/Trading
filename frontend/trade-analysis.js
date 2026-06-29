@@ -4,7 +4,7 @@ function getBackendBase() {
   if (customUrl) {
     return customUrl.replace(/\/$/, '');
   }
-  const injectedUrl = "";
+  const injectedUrl = "__API_BASE_URL__";
   if (injectedUrl && !injectedUrl.startsWith('__')) {
     return injectedUrl.replace(/\/$/, '');
   }

@@ -1,9 +1,9 @@
 {
   "version": 2,
   "cleanUrls": true,
-  "routes": [
-    { "src": "/trade-analysis", "dest": "/frontend/trade-analysis.html" },
-    { "src": "/(index\\.html)?", "dest": "/frontend/index.html" },
-    { "src": "/(.*)", "dest": "/frontend/$1" }
+  "rewrites": [
+    { "source": "/trade-analysis", "destination": "/frontend/trade-analysis.html" },
+    { "source": "/", "destination": "/frontend/index.html" },
+    { "source": "/:path*", "destination": "/frontend/:path*" }
   ]
 }
