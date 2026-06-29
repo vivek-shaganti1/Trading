@@ -242,20 +242,38 @@ function writeLocalDb(data) {
   fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 }
 
-// Check database connectivity
+// Check database connectivity with retries & backoff
+let consecutiveDbFailures = 0;
 async function checkPostgresConnection() {
   if (config.USE_LOCAL_CACHE || !pool) {
     dbAvailable = false;
     return false;
   }
-  try {
-    const client = await pool.connect();
-    client.release();
-    dbAvailable = true;
-  } catch (err) {
-    dbAvailable = false;
+  let attempts = 3;
+  let delay = 1000;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const client = await pool.connect();
+      client.release();
+      dbAvailable = true;
+      if (consecutiveDbFailures > 0) {
+        console.log('[DB RECOVERY]: Neon PostgreSQL connection restored successfully.');
+        consecutiveDbFailures = 0;
+      }
+      return true;
+    } catch (err) {
+      if (i < attempts - 1) {
+        await new Promise(r => setTimeout(r, delay));
+        delay *= 2;
+      }
+    }
   }
-  return dbAvailable;
+  dbAvailable = false;
+  consecutiveDbFailures++;
+  if (consecutiveDbFailures === 1) {
+    console.warn('[DB CRITICAL]: Neon PostgreSQL connection lost. Running on Safe Local Mode.');
+  }
+  return false;
 }
 
 // Helper to run query with auto-fallback logging and retry

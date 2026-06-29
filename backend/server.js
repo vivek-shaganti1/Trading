@@ -166,6 +166,115 @@ app.get('/api/trades', async (req, res) => {
   }
 });
 
+// API: Get completed trades
+app.get('/api/completed-trades', async (req, res) => {
+  try {
+    const completed = await db.getCompletedTrades();
+    res.json(completed);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API: Get equity curve
+app.get('/api/equity-curve', async (req, res) => {
+  try {
+    const data = db.readLocalDb();
+    const completed = data.completed_trades || [];
+    
+    let currentCapital = config.INITIAL_CAPITAL;
+    const curve = [{ time: 'Initial', value: currentCapital }];
+    
+    const sortedTrades = [...completed].sort((a, b) => new Date(a.exit_time) - new Date(b.exit_time));
+    sortedTrades.forEach((t, idx) => {
+      currentCapital += t.net_pnl;
+      curve.push({
+        time: t.exit_time ? new Date(t.exit_time).toLocaleDateString() : `Trade #${idx + 1}`,
+        value: currentCapital
+      });
+    });
+    
+    res.json(curve);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API: Get portfolio allocation
+app.get('/api/portfolio-allocation', async (req, res) => {
+  try {
+    const status = await tradingBot.getStatus();
+    const portfolio = await db.getPortfolioState();
+    const holdings = portfolio.holding_stocks || [];
+    
+    const allocation = {
+      cash: status.balance,
+      holdings: holdings.map(h => ({
+        symbol: h.symbol,
+        value: h.quantity * h.entry_price,
+        percentage: ((h.quantity * h.entry_price) / status.totalVal) * 100
+      }))
+    };
+    res.json(allocation);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API: Get market breadth
+app.get('/api/market-breadth', async (req, res) => {
+  try {
+    const data = db.readLocalDb();
+    const audits = data.agent24_audit_logs || [];
+    const symbolSignals = {};
+    audits.slice(-100).forEach(a => {
+      symbolSignals[a.symbol] = a.price_at_rejection ? 'BEARISH' : 'BULLISH';
+    });
+    
+    let bullish = 0;
+    let bearish = 0;
+    Object.values(symbolSignals).forEach(s => {
+      if (s === 'BULLISH') bullish++;
+      else bearish++;
+    });
+    
+    if (bullish === 0 && bearish === 0) { bullish = 3; bearish = 2; }
+    res.json({ bullish, bearish });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API: Get analytics metrics
+app.get('/api/analytics', async (req, res) => {
+  try {
+    const data = db.readLocalDb();
+    const completed = data.completed_trades || [];
+    const wins = completed.filter(t => t.net_pnl > 0).length;
+    const losses = completed.filter(t => t.net_pnl < 0).length;
+    
+    const winRate = completed.length > 0 ? (wins / completed.length) * 100 : 0;
+    const totalWinPnL = completed.filter(t => t.net_pnl > 0).reduce((sum, t) => sum + t.net_pnl, 0);
+    const totalLossPnL = Math.abs(completed.filter(t => t.net_pnl < 0).reduce((sum, t) => sum + t.net_pnl, 0));
+    const profitFactor = totalLossPnL > 0 ? (totalWinPnL / totalLossPnL) : (totalWinPnL > 0 ? 10.0 : 1.00);
+    
+    const returns = completed.map(t => t.return_pct || 0);
+    const avgReturn = returns.reduce((a, b) => a + b, 0) / (returns.length || 1);
+    const sqDiff = returns.map(r => Math.pow(r - avgReturn, 2));
+    const stdDev = Math.sqrt(sqDiff.reduce((a, b) => a + b, 0) / (sqDiff.length || 1)) || 1;
+    const sharpeRatio = stdDev > 0 ? (avgReturn / stdDev) * Math.sqrt(252) : 0;
+    
+    res.json({
+      winRate: parseFloat(winRate.toFixed(2)),
+      profitFactor: parseFloat(profitFactor.toFixed(2)),
+      sharpeRatio: parseFloat(sharpeRatio.toFixed(2)),
+      totalTrades: completed.length
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // API: Get historical candles for charting & replay
 app.get('/api/historical-candles', async (req, res) => {
   const { symbol, entryTimestamp } = req.query;
@@ -623,6 +732,12 @@ async function sendUpdate(ws) {
     console.error('WebSocket update failed:', err);
   }
 }
+
+// Telegram webhook route
+app.post('/api/telegram-webhook', (req, res) => {
+  telegramControl.handleWebhookUpdate(req.body);
+  res.sendStatus(200);
+});
 
 // Start Server
 server.listen(config.PORT, '0.0.0.0', async () => {

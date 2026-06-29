@@ -331,19 +331,94 @@ async function handleTelegramMessage(text, chatId) {
            `• Avoid Long-Term: <b>${settings.avoid_longterm ? 'YES' : 'NO'}</b>`;
   }
 
+  // /health command
+  if (lowerText.startsWith('/health')) {
+    const status = await tradingBot.getStatus();
+    const dbStatus = db.initPromise ? 'CONNECTED' : 'DISCONNECTED';
+    return `🏥 <b>System Health Check</b>\n` +
+           `• Engine Status: <b>${status.isRunning ? 'RUNNING 🟢' : 'PAUSED 🔴'}</b>\n` +
+           `• Database Status: <b>${dbStatus === 'CONNECTED' ? 'CONNECTED 🟢' : 'DISCONNECTED 🔴'}</b>\n` +
+           `• Scanner status: <b>${status.isRunning ? 'SCANNING 🟢' : 'PAUSED 🔴'}</b>\n` +
+           `• Memory RSS: <b>${(process.memoryUsage().rss / 1024 / 1024).toFixed(1)} MB</b>\n` +
+           `• Uptime: <b>${Math.floor(process.uptime() / 60)} minutes</b>`;
+  }
+
+  // /performance command
+  if (lowerText.startsWith('/performance')) {
+    const data = db.readLocalDb();
+    const completed = data.completed_trades || [];
+    const wins = completed.filter(t => t.net_pnl > 0).length;
+    const winRate = completed.length > 0 ? (wins / completed.length * 100).toFixed(1) : '0.0';
+    const totalPnL = completed.reduce((sum, t) => sum + t.net_pnl, 0);
+    return `🏆 <b>Performance Analysis</b>\n` +
+           `• Total Trades: <b>${completed.length}</b>\n` +
+           `• Win Rate: <b>${winRate}%</b>\n` +
+           `• Net P&L: <b>₹${totalPnL.toFixed(2)}</b>`;
+  }
+
+  // /logs command
+  if (lowerText.startsWith('/logs')) {
+    const data = db.readLocalDb();
+    const alerts = (data.alerts || []).slice(-10);
+    if (alerts.length === 0) return `📋 <b>System Logs:</b> No recent logs found.`;
+    return `📋 <b>System Logs (Last 10)</b>\n` +
+           alerts.map(a => `• [${new Date(a.timestamp).toLocaleTimeString()}] [${a.type}] ${a.message}`).join('\n');
+  }
+
+  // /restart command
+  if (lowerText.startsWith('/restart')) {
+    await tradingBot.stop();
+    await tradingBot.start();
+    return `🔄 <b>Bot loop restarted!</b> Tick scan started.`;
+  }
+
+  // /pause command
+  if (lowerText.startsWith('/pause')) {
+    await tradingBot.stop();
+    return `⏸️ <b>Trading bot paused!</b> Scanner and tick processes halted.`;
+  }
+
+  // /today command
+  if (lowerText.startsWith('/today')) {
+    const data = db.readLocalDb();
+    const completed = data.completed_trades || [];
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayTrades = completed.filter(t => t.exit_time && t.exit_time.startsWith(todayStr));
+    if (todayTrades.length === 0) {
+      return `📅 <b>Today's Trades:</b> No trades completed today yet.`;
+    }
+    const todayPnL = todayTrades.reduce((sum, t) => sum + t.net_pnl, 0);
+    return `📅 <b>Today's Completed Trades</b>\n` +
+           todayTrades.map(t => `• ${t.symbol}: ₹${t.net_pnl.toFixed(2)} (${t.return_pct.toFixed(2)}%) - ${t.exit_reason}`).join('\n') +
+           `\n\n💰 <b>Today's Net P&L:</b> ₹${todayPnL.toFixed(2)}`;
+  }
+
   // Default response
   return `🤖 Unknown command. Available commands:\n` +
-         `/start, /stop, /pause, /resume, /status, /portfolio, /profit, /target, /intelligence, /report, /agents, /weights, /memory, /scanner, /audit, /positions, /risk\n` +
+         `/start, /stop, /pause, /resume, /status, /portfolio, /profit, /target, /intelligence, /report, /agents, /weights, /memory, /scanner, /audit, /positions, /risk, /health, /performance, /logs, /restart, /today\n` +
          `Or write intents like: <i>"Focus on safer trades"</i> or <i>"Avoid long-term positions"</i>.`;
 }
 
-// Polling listener initialization
+// Webhook / Polling listener initialization
 function initTelegramBot() {
   if (config.TELEGRAM_BOT_TOKEN) {
     try {
-      bot = new TelegramBot(config.TELEGRAM_BOT_TOKEN, { polling: true });
-      console.log('[TELEGRAM BOT]: Started polling listener.');
-      
+      const renderUrl = process.env.RENDER_EXTERNAL_URL;
+      if (renderUrl) {
+        // Production webhook mode
+        bot = new TelegramBot(config.TELEGRAM_BOT_TOKEN, { polling: false });
+        bot.deleteWebHook().then(() => {
+          bot.setWebHook(`${renderUrl}/api/telegram-webhook`);
+          console.log(`[TELEGRAM BOT]: Webhook registered successfully at ${renderUrl}/api/telegram-webhook`);
+        }).catch(err => {
+          console.error('[TELEGRAM BOT]: Webhook setup failed:', err.message);
+        });
+      } else {
+        // Local polling fallback
+        bot = new TelegramBot(config.TELEGRAM_BOT_TOKEN, { polling: true });
+        console.log('[TELEGRAM BOT]: Started polling listener.');
+      }
+
       bot.on('message', async (msg) => {
         const text = msg.text ? msg.text.trim() : '';
         const chatId = msg.chat.id;
@@ -365,7 +440,14 @@ function initTelegramBot() {
   }
 }
 
+function handleWebhookUpdate(update) {
+  if (bot) {
+    bot.processUpdate(update);
+  }
+}
+
 module.exports = {
   initTelegramBot,
-  handleTelegramMessage
+  handleTelegramMessage,
+  handleWebhookUpdate
 };

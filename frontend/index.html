@@ -511,6 +511,76 @@
 
     </main>
 
+    <!-- INSTITUTIONAL QUANT TELEMETRY CONSOLE -->
+    <section class="card glass-card" style="margin-bottom: 20px;">
+      <h2 class="card-title text-blue"><i data-lucide="trending-up"></i> Institutional Quant Telemetry Command Center</h2>
+      <p class="card-desc">Comprehensive real-time telemetry metrics, equity curves, sector allocations, and trade journals.</p>
+      
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-top: 15px;">
+        <!-- Left: Equity Curve and Trade Analytics -->
+        <div>
+          <h3 class="text-sm font-semibold" style="margin-bottom: 8px; color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 6px;"><i data-lucide="activity"></i> Cumulative Equity Curve</h3>
+          <div style="height: 200px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; position: relative; padding: 10px;">
+            <canvas id="equity-curve-canvas" style="width: 100%; height: 100%;"></canvas>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px;">
+            <div class="mini-stat-card" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; padding: 10px; text-align: center;">
+              <span class="text-xs" style="color: rgba(255,255,255,0.5);">Profit Factor</span>
+              <div class="text-lg font-bold" id="inst-profit-factor" style="color: var(--color-green);">1.00</div>
+            </div>
+            <div class="mini-stat-card" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; padding: 10px; text-align: center;">
+              <span class="text-xs" style="color: rgba(255,255,255,0.5);">Sharpe Ratio</span>
+              <div class="text-lg font-bold" id="inst-sharpe-ratio" style="color: #6366f1;">0.00</div>
+            </div>
+            <div class="mini-stat-card" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; padding: 10px; text-align: center;">
+              <span class="text-xs" style="color: rgba(255,255,255,0.5);">Market Breadth</span>
+              <div class="text-lg font-bold" id="inst-market-breadth" style="color: var(--color-yellow);">N/A</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Right: Portfolio Allocation and Confidence Heatmap -->
+        <div>
+          <h3 class="text-sm font-semibold" style="margin-bottom: 8px; color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 6px;"><i data-lucide="pie-chart"></i> Asset Allocation</h3>
+          <div style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 12px; font-size: 0.75rem;">
+            <div id="allocation-breakdown" style="display: flex; flex-direction: column; gap: 8px;">
+              <div>Cash: <b id="inst-alloc-cash">₹12,000.00</b></div>
+            </div>
+          </div>
+          
+          <h3 class="text-sm font-semibold" style="margin-top: 15px; margin-bottom: 8px; color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 6px;"><i data-lucide="flame"></i> Agent Heatmap</h3>
+          <div id="agent-heatmap-container" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 0.65rem;">
+            <!-- Seeded heatmap blocks -->
+          </div>
+        </div>
+      </div>
+      
+      <!-- Completed Trade Journal / History Table -->
+      <h3 class="text-sm font-semibold" style="margin-top: 20px; margin-bottom: 8px; color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 6px;"><i data-lucide="book-open"></i> Institutional Trade Journal</h3>
+      <div style="overflow-x: auto; max-height: 180px; background: rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px;">
+        <table class="diagnostic-table text-xs">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th>Qty</th>
+              <th>Entry Price</th>
+              <th>Exit Price</th>
+              <th>Net P&L</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody id="inst-trade-journal-body">
+            <tr>
+              <td colspan="8" class="empty-table text-center">No completed trades recorded in journal.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- BOTTOM SECTION: SYSTEM DIAGNOSTICS & REAL-TIME EVENT CONSOLE -->
     <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
       

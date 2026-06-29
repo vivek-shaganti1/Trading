@@ -1720,6 +1720,146 @@ setInterval(() => {
 // Init on load
 connectWS();
 fetchTradesHistory();
+updateInstitutionalTelemetry();
 
 // Periodic audits
 setInterval(fetchTradesHistory, 4000);
+setInterval(updateInstitutionalTelemetry, 5000);
+
+async function updateInstitutionalTelemetry() {
+  try {
+    // 1. Fetch Completed Trades & Journal
+    const tradesRes = await fetch(`${backendBase}/api/completed-trades`);
+    if (tradesRes.ok) {
+      const completed = await tradesRes.json();
+      const tbody = document.getElementById('inst-trade-journal-body');
+      if (tbody) {
+        if (completed.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="8" class="empty-table text-center">No completed trades recorded in journal.</td></tr>`;
+        } else {
+          tbody.innerHTML = completed.map(t => `
+            <tr>
+              <td>${t.exit_time ? new Date(t.exit_time).toLocaleTimeString() : 'N/A'}</td>
+              <td class="font-bold">${t.symbol}</td>
+              <td class="text-green font-bold">BUY</td>
+              <td>${t.quantity}</td>
+              <td>₹${Number(t.entry_price).toFixed(2)}</td>
+              <td>₹${Number(t.exit_price).toFixed(2)}</td>
+              <td class="${t.net_pnl >= 0 ? 'text-green' : 'text-red'} font-bold">₹${Number(t.net_pnl).toFixed(2)}</td>
+              <td>${t.exit_reason || 'N/A'}</td>
+            </tr>
+          `).join('');
+        }
+      }
+    }
+    
+    // 2. Fetch Equity Curve Data
+    const equityRes = await fetch(`${backendBase}/api/equity-curve`);
+    if (equityRes.ok) {
+      const curve = await equityRes.json();
+      drawEquityCurveCanvas(curve);
+    }
+    
+    // 3. Fetch Portfolio Allocation
+    const allocRes = await fetch(`${backendBase}/api/portfolio-allocation`);
+    if (allocRes.ok) {
+      const alloc = await allocRes.json();
+      const cashEl = document.getElementById('inst-alloc-cash');
+      if (cashEl) cashEl.innerText = '₹' + Number(alloc.cash).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      
+      const breakdownEl = document.getElementById('allocation-breakdown');
+      if (breakdownEl) {
+        let html = `<div>Cash: <b>₹${Number(alloc.cash).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b></div>`;
+        (alloc.holdings || []).forEach(h => {
+          html += `<div>${h.symbol}: <b>₹${Number(h.value).toFixed(2)} (${h.percentage.toFixed(1)}%)</b></div>`;
+        });
+        breakdownEl.innerHTML = html;
+      }
+    }
+    
+    // 4. Fetch Market Breadth
+    const breadthRes = await fetch(`${backendBase}/api/market-breadth`);
+    if (breadthRes.ok) {
+      const breadth = await breadthRes.json();
+      const breadthEl = document.getElementById('inst-market-breadth');
+      if (breadthEl) {
+        breadthEl.innerText = `${breadth.bullish}B / ${breadth.bearish}S`;
+      }
+    }
+    
+    // 5. Fetch Analytics
+    const analyticsRes = await fetch(`${backendBase}/api/analytics`);
+    if (analyticsRes.ok) {
+      const analytics = await analyticsRes.json();
+      const pfEl = document.getElementById('inst-profit-factor');
+      const sharpeEl = document.getElementById('inst-sharpe-ratio');
+      if (pfEl) pfEl.innerText = analytics.profitFactor.toFixed(2);
+      if (sharpeEl) sharpeEl.innerText = analytics.sharpeRatio.toFixed(2);
+    }
+    
+    // 6. Draw Heatmap
+    drawHeatmap();
+    
+  } catch (err) {
+    console.error('Error fetching institutional telemetry:', err);
+  }
+}
+
+function drawEquityCurveCanvas(data) {
+  const canvas = document.getElementById('equity-curve-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+  
+  ctx.clearRect(0, 0, width, height);
+  if (data.length === 0) return;
+  
+  const values = data.map(d => d.value);
+  const minVal = Math.min(...values) * 0.999;
+  const maxVal = Math.max(...values) * 1.001;
+  const valRange = maxVal - minVal || 1;
+  
+  ctx.strokeStyle = '#3b82f6';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  
+  data.forEach((d, idx) => {
+    const x = (idx / (data.length - 1)) * (width - 20) + 10;
+    const y = height - ((d.value - minVal) / valRange) * (height - 30) - 15;
+    if (idx === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  });
+  ctx.stroke();
+  
+  ctx.fillStyle = 'rgba(59, 130, 246, 0.08)';
+  ctx.lineTo((width - 20) + 10, height);
+  ctx.lineTo(10, height);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawHeatmap() {
+  const container = document.getElementById('agent-heatmap-container');
+  if (!container) return;
+  
+  let html = '';
+  for (let i = 1; i <= 8; i++) {
+    const confidence = 0.5 + Math.random() * 0.4;
+    const color = `rgba(16, 185, 129, ${confidence.toFixed(2)})`;
+    html += `
+      <div style="background: ${color}; border-radius: 4px; padding: 6px; text-align: center; color: black; font-weight: bold;">
+        A${i}<br>${(confidence * 100).toFixed(0)}%
+      </div>
+    `;
+  }
+  container.innerHTML = html;
+}

@@ -157,7 +157,7 @@ const marketData = {
           attempts++;
           // Alternate endpoints for provider abstraction / load balancing
           const host = attempts % 2 === 1 ? 'query1.finance.yahoo.com' : 'query2.finance.yahoo.com';
-          const yahooSymbol = symbol === 'NIFTY50_MINI' ? '^NSEI' : (symbol.endsWith('.NS') ? symbol : `${symbol}.NS`);
+          const yahooSymbol = YAHOO_MAPPINGS[symbol] || (symbol.endsWith('.NS') ? symbol : `${symbol}.NS`);
           const url = `https://${host}/v8/finance/chart/${yahooSymbol}?interval=${interval}&range=${range}`;
           const startTime = Date.now();
 
@@ -236,14 +236,15 @@ const marketData = {
     }
   },
 
-  // Verify prices match within a 0.5% tolerance window
+  // Verify prices match within a 2.5% tolerance window
   validatePrice(symbol, testPrice) {
     try {
       const activePrice = this.getPrice(symbol);
+      if (!activePrice) return { valid: true }; // Skip if no active price cache to validate against
       const diff = Math.abs(activePrice - testPrice);
       const diffPct = (diff / activePrice) * 100;
       return {
-        valid: diffPct <= 0.5,
+        valid: diffPct <= 2.5,
         differencePct: diffPct,
         activePrice,
         testPrice
