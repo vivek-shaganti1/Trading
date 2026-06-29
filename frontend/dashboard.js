@@ -229,7 +229,7 @@ function updateUI(data) {
   }
 
   // Update System Time
-  liveTimeText.innerText = data.time + ' IST';
+  window.lastServerTime = data.time;
 
   // Update Valuation & Profit Command Center
   const statTotalValEl = document.getElementById('stat-total-value');
@@ -1714,6 +1714,15 @@ setInterval(() => {
     }
   } else {
     if (heartbeatWarning) heartbeatWarning.style.display = 'none';
+  }
+
+  // Update IST clock every second locally using browser time
+  if (liveTimeText) {
+    const options = { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+    const istTime = new Date().toLocaleTimeString('en-US', options);
+    const dateOptions = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' };
+    const istDate = new Date().toLocaleDateString('en-GB', dateOptions);
+    liveTimeText.innerText = `${istDate} ${istTime} IST`;
   }
 }, 1000);
 
