@@ -12,6 +12,7 @@ const providerHealth = require('./providerHealth');
 const volumeIntelligenceAgent = require('./volumeIntelligenceAgent');
 
 const pendingExecutions = new Set();
+let entriesPaused = false;
 
 function getVoteBreakdown(prediction) {
   const breakdown = { BUY: 0, SELL: 0, HOLD: 0 };
@@ -578,6 +579,20 @@ const tradingBot = {
     }
   },
 
+  pauseEntries() {
+    entriesPaused = true;
+    console.log('[BOT] Entries are paused.');
+  },
+
+  resumeEntries() {
+    entriesPaused = false;
+    console.log('[BOT] Entries are resumed.');
+  },
+
+  areEntriesPaused() {
+    return entriesPaused;
+  },
+
   async getStatus() {
     const valuation = await broker.getValuation();
     const portfolio = await db.getPortfolioState();
@@ -881,7 +896,7 @@ const tradingBot = {
       marketDataMode: modeString,
       marketDataProvider: marketData.getProviderName(),
       priceValidationStatus: validationString,
-      strategy: 'EXPECTANCY_OPTIMIZED',
+      strategy: portfolio.strategy || 'EXPECTANCY_OPTIMIZED',
       time: `${timeInfo.hours.toString().padStart(2, '0')}:${timeInfo.minutes.toString().padStart(2, '0')}`,
       balance: valuation.balance,
       equityValue: valuation.equityValue,
@@ -1591,6 +1606,50 @@ const tradingBot = {
       console.error('[BOT] Failed to run real trade exits:', realExitErr.message);
     }
 
+    // Mid-Session Strategy Switch at 2:30 PM (14:30 IST)
+    if (currentMins >= 14 * 60 + 30 && currentMins < 15 * 60 + 15) {
+      const dbStats = await db.getDailyStats(timeInfo.dateStr);
+      if (portfolio.strategy !== 'LONG_TERM' && (!dbStats || !dbStats.strategy_switched)) {
+        console.log('[SCHEDULER] 14:30 IST - Mid-session switch. Transitioning from DAY_TRADING to LONG_TERM blue chips...');
+        
+        // 1. Update strategy in DB portfolio state
+        await db.updatePortfolioState({ strategy: 'LONG_TERM' });
+        portfolio.strategy = 'LONG_TERM';
+        
+        // 2. Mark strategy_switched as true in daily stats
+        if (currentDayStats) {
+          currentDayStats.strategy_switched = true;
+          await db.saveDailyStats(currentDayStats);
+        }
+        
+        // 3. Sell any active day trading positions
+        const activePositions = portfolio.holding_stocks || [];
+        for (const pos of activePositions) {
+          if (pos.strategy !== 'LONG_TERM') {
+            console.log(`[STRATEGY SWITCH] Liquidating day trading position: ${pos.symbol}`);
+            await broker.executeOrder(pos.symbol, 'SELL', pos.quantity, pos.strategy, 'Mid-session switch liquidation');
+          }
+        }
+        
+        // 4. Reallocate assets by buying blue chips: RELIANCE, TCS, HDFCBANK, INFOSYS
+        const blueChips = ['RELIANCE', 'TCS', 'HDFCBANK', 'INFOSYS'];
+        for (const sym of blueChips) {
+          const ltp = await broker.getLTP(sym);
+          if (ltp > 0) {
+            const freshPortfolio = await db.getPortfolioState();
+            const qty = 1;
+            const cost = ltp * qty;
+            if (freshPortfolio.balance >= cost) {
+              console.log(`[STRATEGY SWITCH] Reallocating capital to blue chip: ${sym} Qty: ${qty}`);
+              await broker.executeOrder(sym, 'BUY', qty, 'LONG_TERM', 'Reallocation to blue chip');
+            }
+          }
+        }
+        
+        await alerts.sendTelegram('🔄 <b>Mid-Session Strategy Switch:</b> Portfolio transitioned to LONG_TERM blue chips. Reallocating assets...');
+      }
+    }
+
     if (currentMins >= 9 * 60 + 15 && currentDayStats.status === 'ACTIVE') {
       await this.updateDailyPNL(valuation);
     }
@@ -2077,6 +2136,11 @@ const tradingBot = {
         };
 
         const detailedReason = `Expectancy entry (${execMode} Mode): TQS ${tqs}%, allocation ${finalAllocationPct}% | REPORT: ${JSON.stringify(executionReport)}`;
+
+        if (entriesPaused) {
+          console.warn(`[PORTFOLIO] Entries are currently paused. Skipping execution for ${item.symbol}.`);
+          continue;
+        }
 
         if (pendingExecutions.has(item.symbol)) {
           console.warn(`[PORTFOLIO] Order for ${item.symbol} is already in-flight. Skipping duplicate.`);

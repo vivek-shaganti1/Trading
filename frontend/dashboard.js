@@ -784,8 +784,12 @@ function updateActivePositions(holdings, prices) {
       stopProgress = Math.min(100, ((h.avgPrice - ltp) / (h.avgPrice - stopLoss)) * 100);
     }
 
-    // holding time tracking (mocked based on mock execution time or actual)
-    const holdingTime = '12m 45s';
+    // holding time tracking (computed based on actual timestamp if available)
+    const entryMs = h.timestamp ? new Date(h.timestamp).getTime() : Date.now();
+    const elapsedSec = Math.max(0, Math.floor((Date.now() - entryMs) / 1000));
+    const elapsedMin = Math.floor(elapsedSec / 60);
+    const elapsedSecRemainder = elapsedSec % 60;
+    const holdingTime = `${elapsedMin}m ${elapsedSecRemainder}s`;
 
     return `
       <div class="active-position-card" onclick="explainHoldingTrade('${h.symbol}')" style="cursor:pointer">

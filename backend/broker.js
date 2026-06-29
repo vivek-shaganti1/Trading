@@ -634,7 +634,8 @@ const broker = {
           participating_models,
           execution_mode,
           stopLossPrice,
-          targetPrice
+          targetPrice,
+          timestamp: new Date().toISOString()
         });
       }
     } else if (action === 'SELL') {

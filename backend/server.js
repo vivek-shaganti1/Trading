@@ -142,6 +142,16 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
+// Telegram Health Endpoint
+app.get('/api/telegram/health', (req, res) => {
+  try {
+    const health = telegramControl.getTelegramHealth();
+    res.json(health);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // API: Start/Stop bot
 app.post('/api/control', async (req, res) => {
   const { action } = req.body;
