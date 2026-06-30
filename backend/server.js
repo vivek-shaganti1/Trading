@@ -113,43 +113,62 @@ app.get('/api/status', async (req, res) => {
   }
 });
 
+async function getSystemHealth() {
+  const status = await tradingBot.getStatus();
+  const dbStatus = db.isNeonOnline() ? 'CONNECTED' : 'DISCONNECTED';
+  const tgHealth = telegramControl.getTelegramHealth();
+  const tgStatus = tgHealth.status === 'CONNECTED' ? (tgHealth.webhook ? 'WEBHOOK' : 'POLLING') : 'OFFLINE';
+  
+  return {
+    status: 'healthy',
+    version: '1.0.0',
+    uptime_seconds: Math.floor(process.uptime()),
+    current_bot_state: status.isRunning ? 'RUNNING' : 'PAUSED',
+    current_market_state: status.isMarketOpen ? 'OPEN' : 'CLOSED',
+    services: {
+      database: dbStatus,
+      telegram: tgStatus,
+      scheduler: 'ACTIVE',
+      trading_engine: status.isRunning ? 'ACTIVE' : 'PAUSED',
+      market_data: 'STABLE',
+      websocket: 'ONLINE'
+    },
+    system: {
+      memory_usage: process.memoryUsage(),
+      cpu_usage: process.cpuUsage()
+    }
+  };
+}
+
 // Health check endpoint
 app.get('/api/health', async (req, res) => {
   try {
-    const status = await tradingBot.getStatus();
-    const dbStatus = db.isNeonOnline() ? 'CONNECTED' : 'DISCONNECTED';
-    const tgHealth = telegramControl.getTelegramHealth();
-    const tgStatus = tgHealth.status === 'CONNECTED' ? (tgHealth.webhook ? 'WEBHOOK' : 'POLLING') : 'OFFLINE';
-    
-    res.json({
-      status: 'healthy',
-      version: '1.0.0',
-      uptime_seconds: Math.floor(process.uptime()),
-      services: {
-        scanner: status.isRunning ? 'READY' : 'PAUSED',
-        trading_engine: status.isRunning ? 'ACTIVE' : 'PAUSED',
-        database: dbStatus,
-        market_data: 'STABLE',
-        telegram: tgStatus,
-        websocket: 'ONLINE',
-        learning_engine: 'SYNCED',
-        scheduler: 'ACTIVE'
-      },
-      system: {
-        memory_usage: process.memoryUsage(),
-        cpu_usage: process.cpuUsage()
-      }
-    });
+    const health = await getSystemHealth();
+    res.json(health);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Trading Health check endpoint
+app.get('/api/trading/health', async (req, res) => {
+  try {
+    const health = await getSystemHealth();
+    res.json(health);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // Telegram Health Endpoint
-app.get('/api/telegram/health', (req, res) => {
+app.get('/api/telegram/health', async (req, res) => {
   try {
-    const health = telegramControl.getTelegramHealth();
-    res.json(health);
+    const health = await getSystemHealth();
+    const tgHealth = telegramControl.getTelegramHealth();
+    res.json({
+      ...health,
+      telegram_details: tgHealth
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
