@@ -822,7 +822,7 @@ app.post('/api/telegram-webhook', (req, res) => {
 });
 
 // Start Server
-server.listen(config.PORT, '0.0.0.0', async () => {
+server.listen(config.PORT, '0.0.0.0', () => {
   console.log(`=========================================`);
   console.log(`🚀 Automated Trading Server Active`);
   console.log(`💻 Database: ${config.USE_LOCAL_CACHE ? 'Local Cache (db.json)' : 'Neon PostgreSQL'}`);
@@ -835,27 +835,30 @@ server.listen(config.PORT, '0.0.0.0', async () => {
   // Initialize Telegram Bot command center polling listener
   telegramControl.initTelegramBot();
   
-  try {
-    console.log('[STARTUP] Awaiting database recovery initialization...');
-    await db.initPromise;
-    console.log('[STARTUP] Database connection and schema verified.');
-    
-    // Log restored learning state
-    const localState = db.readLocalDb();
-    const memoryCount = (localState.agent26_market_memory || []).length;
-    const trustLogCount = (localState.agent21_trust_logs || []).length;
-    const researchLogCount = (localState.agent22_research_logs || []).length;
-    const journalCount = (localState.agent23_journals || []).length;
-    const a20Count = (localState.agent20_reports || []).length;
-    const a24Count = (localState.agent24_audit_logs || []).length;
-    console.log(`[STARTUP] Learning State: ${memoryCount} market memories, ${trustLogCount} trust logs, ${researchLogCount} research logs, ${journalCount} journals, ${a20Count} analyst reports, ${a24Count} audit logs`);
-    
-    await predictor.loadLeaderboardFromDb();
-    
-    // Start bot automatically
-    await tradingBot.start();
-    console.log('[STARTUP] Trading bot started successfully.');
-  } catch (err) {
-    console.error('[STARTUP] Error during async boot sequence:', err);
-  }
+  // Perform database recovery and trading engine start in the background to ensure instantaneous boot response
+  (async () => {
+    try {
+      console.log('[STARTUP] Awaiting database recovery initialization in background...');
+      await db.initPromise;
+      console.log('[STARTUP] Database connection and schema verified.');
+      
+      // Log restored learning state
+      const localState = db.readLocalDb();
+      const memoryCount = (localState.agent26_market_memory || []).length;
+      const trustLogCount = (localState.agent21_trust_logs || []).length;
+      const researchLogCount = (localState.agent22_research_logs || []).length;
+      const journalCount = (localState.agent23_journals || []).length;
+      const a20Count = (localState.agent20_reports || []).length;
+      const a24Count = (localState.agent24_audit_logs || []).length;
+      console.log(`[STARTUP] Learning State: ${memoryCount} market memories, ${trustLogCount} trust logs, ${researchLogCount} research logs, ${journalCount} journals, ${a20Count} analyst reports, ${a24Count} audit logs`);
+      
+      await predictor.loadLeaderboardFromDb();
+      
+      // Start bot automatically
+      await tradingBot.start();
+      console.log('[STARTUP] Trading bot started successfully.');
+    } catch (err) {
+      console.error('[STARTUP] Error during async background boot sequence:', err);
+    }
+  })();
 });
