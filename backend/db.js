@@ -237,9 +237,26 @@ function readLocalDb() {
 }
 
 // Helper to write local DB
+let isWriting = false;
+let pendingWrite = null;
+
 function writeLocalDb(data) {
   localDbCache = data;
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+  if (isWriting) {
+    pendingWrite = data;
+    return;
+  }
+  isWriting = true;
+  // Non-blocking disk I/O
+  fs.writeFile(DB_FILE, JSON.stringify(data, null, 2), (err) => {
+    isWriting = false;
+    if (err) console.error('[DB ERROR] Failed to write db.json:', err.message);
+    if (pendingWrite) {
+      const nextData = pendingWrite;
+      pendingWrite = null;
+      writeLocalDb(nextData);
+    }
+  });
 }
 
 // Check database connectivity with retries & backoff

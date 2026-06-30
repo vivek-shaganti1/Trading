@@ -117,9 +117,9 @@ app.get('/trade-analysis', (req, res) => {
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // API: Get current status
-app.get('/api/status', async (req, res) => {
+app.get('/api/status', (req, res) => {
   try {
-    const status = await tradingBot.getStatus();
+    const status = runtimeState.getSnapshot();
     res.json(status);
   } catch (err) {
     structuredErrorLog('API', req, err);
@@ -957,9 +957,9 @@ server.listen(config.PORT, '0.0.0.0', () => {
       
       console.log('[STARTUP] Connect Broker');
       if (broker.connect) await broker.connect();
-      
+      // 4. Initialize Telegram (Webhook/Polling based on NODE_ENV)
       console.log('[STARTUP] Init Telegram');
-      telegramControl.initTelegramBot();
+      telegramControl.initTelegram(app);
       
       console.log('[STARTUP] Init Scanner');
       const marketScanner = require('../scratch/market_scanner');
