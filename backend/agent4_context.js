@@ -20,9 +20,11 @@ async function getPercentageChange(ticker) {
       return parseFloat((((last - first) / first) * 100).toFixed(4));
     }
   } catch (err) {
-    // Return a default small random walk value if rate-limited or closed
+    // Return neutral 0.0 when data is unavailable — do NOT use Math.random()
+    // Random noise here propagates through every AI signal downstream
+    console.warn(`[Agent4/Context] Macro data unavailable for ${ticker}: ${err.message}. Using neutral 0.0`);
   }
-  return parseFloat(((Math.random() - 0.5) * 0.4).toFixed(4));
+  return 0.0;
 }
 
 // Fetch Sector proxy prices to calculate Sector Rotation

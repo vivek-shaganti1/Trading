@@ -364,7 +364,7 @@ const tradingBot = {
       bottleneckDetected: false,
       recommendedThreshold: 65,
       expectedAdditionalTrades: 0,
-      winRateImpact: '+2.8% win rate stabilization'
+      winRateImpact: null  // Computed from actual trade history — never hardcoded
     });
   },
 
@@ -829,7 +829,7 @@ const tradingBot = {
     const marketDataDiagnostics = {
       dataProvider: marketData.getProviderName(),
       lastPriceTimestamp: debugData.lastApiResponseTimestamp || 'None',
-      lastApiResponseTime: debugData.lastApiUrlCalled !== 'None' ? '310ms' : 'None',
+      lastApiResponseTime: runtimeState.state.provider_health.yahoo.latency_ms !== null ? `${runtimeState.state.provider_health.yahoo.latency_ms}ms` : 'N/A',
       marketStatus: debugData.marketStatus || 'CLOSED',
       sourceOfTruth: marketData.getMode(),
       mode: config.BROKER_MODE === 'LIVE' ? 'LIVE' : 'SIMULATOR'
@@ -855,11 +855,22 @@ const tradingBot = {
       scanned: lastLog ? lastLog.scanned : 0,
       passedTQS: lastLog ? lastLog.stage2_ranked : 0,
       passedConfidence: lastLog ? lastLog.stage3_candidates : 0,
-      passedRisk: lastLog ? lastLog.stage4_consensus : 0,
-      passedConsensus: lastLog ? lastLog.passed_risk : 0,
+      passedRisk: lastLog ? (lastLog.passed_risk || 0) : 0,
+      passedConsensus: lastLog ? (lastLog.stage4_consensus || 0) : 0,
       submitted: lastLog ? lastLog.stage5_executed : 0,
       filled: lastLog ? lastLog.stage5_executed : 0
     };
+
+    // Push funnel data to runtimeState (single source of truth)
+    runtimeState.updateFunnel({
+      stage1_scanned:    cycle.scanned,
+      stage2_tqs_passed: cycle.passedTQS,
+      stage3_technical:  cycle.passedConfidence,
+      stage5_risk:       cycle.passedRisk,
+      stage6_consensus:  cycle.passedConsensus,
+      stage7_submitted:  cycle.submitted,
+      stage8_filled:     cycle.filled
+    });
 
     const todayTradesList = (dbData.trade_logs || []).filter(t => isTodayIST(t.timestamp));
     const todayBuyTrades = todayTradesList.filter(t => t.action === 'BUY');
@@ -969,10 +980,23 @@ const tradingBot = {
       'scanner.scan_speed': scannerStats.symbolsPerMin || 0,
       'scanner.last_scan_timestamp': scannerStats.lastScanTime || 'None',
       'scanner.scanner_health': isTicking ? 'ACTIVE' : 'PAUSED',
+      'financials.total_value': valuation.totalVal,
+      'financials.net_pnl': netPnL,
       'positions': valuation.holdingStocks || [],
       'pending_orders': pendingExecutions ? Array.from(pendingExecutions) : [],
       'timeline': preMarketState.timeline || [],
       'auditLog': preMarketState.auditLog || []
+    });
+
+    // Push real performance metrics to runtimeState
+    runtimeState.updatePerformance({
+      today_trades:       today.trades,
+      today_wins:         todayBuyTrades.length > 0 ? Math.round(winRateVal / 100 * todaySellTrades.length) : 0,
+      today_losses:       todaySellTrades.length - Math.round(winRateVal / 100 * todaySellTrades.length),
+      today_win_rate:     winRateVal,
+      today_realized_pnl: today.netPnL,
+      lifetime_trades:    lifetime.trades,
+      lifetime_win_rate:  lifetime.winRate
     });
 
     return {
@@ -1015,7 +1039,8 @@ const tradingBot = {
         lifetime,
         scannerStats
       },
-      providerHealth: providerHealth.getHealth()
+      providerHealth: providerHealth.getHealth(),
+      runtime: runtimeState.getSnapshot()
     };
   },
 
@@ -1035,7 +1060,9 @@ const tradingBot = {
     const dailyPnL = currentDayStats ? parseFloat((valuation.totalVal - currentDayStats.start_capital).toFixed(2)) : 0;
     const remainingTarget = Math.max(0, dailyTarget - dailyPnL);
     
-    const winRate = 0.65; // Verified Swing Win Rate
+    const winRate = runtimeState.state.performance.today_win_rate > 0
+      ? runtimeState.state.performance.today_win_rate / 100  // Convert from percentage to decimal
+      : 0.55;  // Conservative default when no trade data available
     const avgWin = parseFloat((valuation.totalVal * 0.20 * 0.03).toFixed(2));   // 3% gain on 20% capital allocation
     const avgLoss = parseFloat((valuation.totalVal * 0.20 * 0.015).toFixed(2));  // 1.5% loss on 20% capital stop-loss
     const expectedProfitPerTrade = (winRate * avgWin) - ((1 - winRate) * avgLoss);
@@ -2923,8 +2950,8 @@ const tradingBot = {
         await db.savePaperTradingResults({
           trading_days_tracked: newDays,
           win_rate: parseFloat((( (currentPaperResults?.win_rate || 0) * prevDays + winRate ) / newDays).toFixed(2)),
-          profit_factor: 1.25, // Mock default or calculated
-          sharpe_ratio: 1.85,
+          profit_factor: parseFloat(todayProfitFactor.toFixed(2)) || 0,  // Real: gross wins / gross losses from today
+          sharpe_ratio: null,                                              // Not computed without daily return series
           max_drawdown: Math.max(currentPaperResults?.max_drawdown || 0, dailyLossPct > 0 ? dailyLossPct : 0),
           accuracy: parseFloat((( (currentPaperResults?.accuracy || 0) * prevDays + winRate ) / newDays).toFixed(2)),
           net_pnl: newNetPnL,

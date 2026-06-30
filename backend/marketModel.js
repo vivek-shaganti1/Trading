@@ -166,9 +166,11 @@ async function getPercentageChange(ticker) {
       return parseFloat((((last - first) / first) * 100).toFixed(4));
     }
   } catch (err) {
-    // Ignore
+    // Return neutral 0.0 — do NOT use Math.random()
+    // Random values here corrupt neural network inputs and all downstream signals
+    console.warn(`[MarketModel] Macro data unavailable for ${ticker}: ${err.message}. Using neutral 0.0`);
   }
-  return parseFloat(((Math.random() - 0.5) * 0.5).toFixed(4));
+  return 0.0;
 }
 
 // Deep Layer forward pass matching 17x32x16x3 or original 6x8x3 architecture

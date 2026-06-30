@@ -315,13 +315,30 @@ Status: UNAUTHORIZED
       const status = await tradingBot.getStatus();
       const stats = status.dailyStats;
       const dailyPnL = stats ? stats.net_pnl : 0;
+      const runtime = status.runtime || {};
+      const auditLogs = db.readLocalDb().agent24_audit_logs || [];
+      const totalAudited = auditLogs.length;
+      // Compute real losses prevented and missed profit from audit records
+      let lossesPrevented = 0;
+      let missedProfit = 0;
+      auditLogs.forEach(log => {
+        const priceMoveRupees = (log.actual_move_pct || 0) / 100 * (log.price_at_rejection || 0) * (log.suggested_quantity || 1);
+        if (priceMoveRupees < 0) {
+          lossesPrevented += Math.abs(priceMoveRupees);
+        } else if (priceMoveRupees > 0) {
+          missedProfit += priceMoveRupees;
+        }
+      });
+      const capitalUtil = runtime.financials
+        ? runtime.financials.capital_utilization.toFixed(1)
+        : ((status.totalVal - status.balance) / status.totalVal * 100).toFixed(1);
       response = `📊 <b>Institutional Profitability Audit</b>\n` +
                  `• Today Net PnL: <b>₹${dailyPnL.toFixed(2)}</b>\n` +
-                 `• Starting capital: <b>₹12,000.00</b>\n` +
-                 `• Capital utilization: <b>24.3%</b>\n` +
-                 `• Opportunities audited: <b>12,981</b>\n` +
-                 `• Losses prevented: <b>₹8,363,469.06</b>\n` +
-                 `• Missed Profit (Skipped Wins): <b>₹449,246.99</b>`;
+                 `• Starting capital: <b>₹${(stats ? stats.start_capital : status.totalVal).toFixed(2)}</b>\n` +
+                 `• Capital utilization: <b>${capitalUtil}%</b>\n` +
+                 `• Opportunities audited: <b>${totalAudited.toLocaleString()}</b>\n` +
+                 `• Losses prevented: <b>₹${lossesPrevented.toFixed(2)}</b>\n` +
+                 `• Missed Profit (Skipped Wins): <b>₹${missedProfit.toFixed(2)}</b>`;
     }
     // /risk command
     else if (lowerText.startsWith('/risk')) {

@@ -20,6 +20,7 @@ const marketStateClassifier = require('./marketStateClassifier');
 const marketStructureHierarchy = require('./marketStructureHierarchy');
 const bayesianConfidenceEngine = require('./bayesianConfidenceEngine');
 const stopTargetEngine = require('./stopTargetEngine');
+const runtimeState = require('./runtimeState');
 
 
 
@@ -90,7 +91,9 @@ async function callGemini(symbol, ltp, pred1, pred4, pred5) {
     clearTimeout(timeoutId);
 
     if (response.ok) {
+      const latencyMs = Date.now() - startTime;
       providerHealth.recordCall('Gemini', startTime, true, '200 OK');
+      runtimeState.updateProviderHealth('gemini', latencyMs, true);
       const resData = await response.json();
       const text = resData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
       const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -101,10 +104,14 @@ async function callGemini(symbol, ltp, pred1, pred4, pred5) {
         reasoning: parsed.debate_summary || 'Gemini dynamic analysis'
       };
     } else {
+      const latencyMs = Date.now() - startTime;
       providerHealth.recordCall('Gemini', startTime, false, `Status ${response.status}`);
+      runtimeState.updateProviderHealth('gemini', latencyMs, false);
     }
   } catch (err) {
+    const latencyMs = Date.now() - startTime;
     providerHealth.recordCall('Gemini', startTime, false, err.message);
+    runtimeState.updateProviderHealth('gemini', latencyMs, false);
     console.warn(`[GEMINI API] Failed: ${err.message}. Running fallback...`);
   }
   return runGeminiFallback(symbol, pred4?.indicators);
@@ -361,32 +368,10 @@ const predictor = {
         marketData.getHistory(symbol, [], '1m', '1d')
       ]);
     } catch (err) {
-      console.warn(`[PREDICTOR] Failed to fetch live MTF histories for ${symbol}: ${err.message}. Falling back to simulated history.`);
-      // Mock/simulated fallback - generate 50 candles to prevent out of bound index errors
-      const generateMock = (basePrice, seed = 1, count = 50) => {
-        const mockCloses = [];
-        const mockHighs = [];
-        const mockLows = [];
-        const mockVolumes = [];
-        let currentPrice = basePrice;
-        const bias = (Math.sin(seed) * 0.05) / 100;
-        
-        for (let i = 0; i < count; i++) {
-          mockCloses.unshift(parseFloat(currentPrice.toFixed(2)));
-          mockHighs.unshift(parseFloat((currentPrice * (1 + 0.003 * Math.random())).toFixed(2)));
-          mockLows.unshift(parseFloat((currentPrice * (1 - 0.003 * Math.random())).toFixed(2)));
-          mockVolumes.unshift(Math.round(5000 + Math.random() * 10000));
-          
-          const change = ((Math.random() * 0.3 - 0.15) / 100) + bias;
-          currentPrice = currentPrice / (1 + change);
-        }
-        return { closes: mockCloses, highs: mockHighs, lows: mockLows, volumes: mockVolumes };
-      };
-      d1History = generateMock(ltp, 1);
-      h1History = generateMock(ltp, 2);
-      m15History = generateMock(ltp, 3);
-      m5History = generateMock(ltp, 4);
-      m1History = generateMock(ltp, 5);
+      // Do NOT generate mock/random candles — random candles corrupt AI signals.
+      // Rethrow so the calling pipeline can log the rejection and skip this symbol.
+      console.warn(`[PREDICTOR] Market data unavailable for ${symbol}: ${err.message}. Skipping symbol.`);
+      throw new Error(`Market data unavailable for ${symbol}: ${err.message}`);
     }
 
     // Helper: Map closes to candles

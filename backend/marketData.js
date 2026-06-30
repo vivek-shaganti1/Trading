@@ -1,5 +1,6 @@
 const config = require('../shared/config');
 const providerHealth = require('./providerHealth');
+const runtimeState = require('./runtimeState');
 
 const currentPrices = {};
 const priceSources = {}; // Tracks the source mode ('LIVE' or 'SIMULATOR') for each cached price
@@ -172,7 +173,9 @@ const marketData = {
             if (!res.ok) throw new Error(`Yahoo HTTP error: ${res.status}`);
 
             const data = await res.json();
+            const yahooLatencyMs = Date.now() - startTime;
             providerHealth.recordCall('Yahoo', startTime, true, '200 OK');
+            runtimeState.updateProviderHealth('yahoo', yahooLatencyMs, true);
 
             const quotes = data?.chart?.result?.[0]?.indicators?.quote?.[0] || {};
             const closes = (quotes.close || []).filter(c => c !== null && c !== undefined);
@@ -191,7 +194,9 @@ const marketData = {
 
           } catch (err) {
             lastErr = err;
+            const yahooErrLatencyMs = Date.now() - startTime;
             providerHealth.recordCall('Yahoo', startTime, false, err.message);
+            runtimeState.updateProviderHealth('yahoo', yahooErrLatencyMs, false);
             // Exponential backoff delay
             await new Promise(r => setTimeout(r, backoffDelay));
             backoffDelay *= 2;

@@ -700,6 +700,20 @@ const broker = {
     };
   },
 
+  // Modify an existing order (exchange-side)
+  // Currently not supported in fire-and-forget architecture — orders are MARKET orders filled instantly
+  async modifyOrder(orderId, newPrice, newQuantity) {
+    console.warn(`[BROKER] modifyOrder(${orderId}) called but not supported — MARKET orders fill instantly.`);
+    throw new Error(`Order modification not supported for MARKET orders. OrderId: ${orderId}`);
+  },
+
+  // Cancel an existing order (exchange-side)
+  // Currently not supported — MARKET orders fill instantly before cancel can be processed
+  async cancelOrder(orderId) {
+    console.warn(`[BROKER] cancelOrder(${orderId}) called but not supported — MARKET orders fill instantly.`);
+    throw new Error(`Order cancellation not supported for MARKET orders. OrderId: ${orderId}`);
+  },
+
   // Calculate portfolio PnL and valuation
   async getValuation() {
     const portfolio = await db.getPortfolioState();

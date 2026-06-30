@@ -267,7 +267,7 @@ function updateUI(data) {
   if (statBalanceEl) statBalanceEl.innerText = '₹' + Number(data.balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (statEquityEl) statEquityEl.innerText = '₹' + Number(data.equityValue).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const pnlPercent = ((data.netPnL / 12000) * 100).toFixed(2);
+  const pnlPercent = ((data.netPnL / (data.totalVal || data.balance || 1)) * 100).toFixed(2);
   const pnlPrefix = data.netPnL >= 0 ? '+' : '';
   if (statNetPnLEl) {
     statNetPnLEl.innerText = `${pnlPrefix}₹${Number(data.netPnL).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${pnlPrefix}${pnlPercent}%)`;
@@ -734,34 +734,18 @@ window.inspectFunnelStage = function(stageName, count) {
   
   modal.classList.add('active');
 
-  // Realistic mock audit records of rejected candidates for execution transparency
-  const mockRejections = {
-    'Scanned': ['Universe verified correctly. No initial rejections.'],
-    'TQS Passed': [
-      'TCS (TQS 58 < 70) — Volatility threshold check failed',
-      'INFOSYS (TQS 62 < 70) — Technical indicators momentum bearish',
-      'APOLLOHOSP (TQS 49 < 70) — Liquidity spread too wide'
-    ],
-    'Confidence Passed': [
-      'HDFCBANK (Confidence 0.54 < 0.70) — Low buying conviction',
-      'TITAN (Confidence 0.61 < 0.70) — Weak intraday EMA cross'
-    ],
-    'Risk Passed': [
-      'SBIN (Risk: daily drawdown limits threshold reached)',
-      'ICICIBANK (Risk: maximum portfolio assets sector weight allocation cap exceeded)'
-    ],
-    'Consensus Passed': [
-      'JSWSTEEL (Consensus: 4/10 agents voted BUY - consensus rejected)'
-    ],
-    'Submitted': [
-      'COALINDIA — Rejected by simulator engine due to high price tick slippage limit'
-    ],
-    'Filled': [
-      'No order rejections on broker fill loop today.'
-    ]
-  };
+  // Read rejection data from last status payload instead of hardcoded mocks
+  const rejections = window._lastStatusData && window._lastStatusData.runtime
+    ? (window._lastStatusData.runtime.funnel || {}).last_rejected || []
+    : [];
 
-  const list = mockRejections[stageName] || ['No rejections logged at this stage.'];
+  // Filter rejections relevant to this stage if possible
+  const stageRejections = rejections.filter(r => (r.stage || '') === stageName);
+  const list = stageRejections.length > 0
+    ? stageRejections.map(r => r.reason || `${r.symbol || 'Unknown'} — rejected`)
+    : (rejections.length > 0
+      ? ['No rejections logged at this specific stage.']
+      : ['No rejection data available — connect to runtimeState.funnel.last_rejected']);
 
   modalBody.innerHTML = `
     <h4 style="margin-bottom: 10px; color: var(--accent-blue);">Failed Candidates for stage: ${stageName}</h4>
@@ -923,33 +907,35 @@ function updateAgentWarRoom(data) {
   const body = document.getElementById('agent-war-room-body');
   if (!body) return;
 
-  // Compile stats
-  const agents = [
-    { name: 'ML Ensemble', accuracy: '68%', pnl: 2840, vote: 'BUY', winRate: '68%', status: 'profitable' },
-    { name: 'Gemini 2.0', accuracy: '51%', pnl: 820, vote: 'BUY', winRate: '51%', status: 'profitable' },
-    { name: 'Groq Llama', accuracy: '54%', pnl: 540, vote: 'BUY', winRate: '54%', status: 'profitable' },
-    { name: 'Risk Manager', accuracy: '100%', pnl: 0, vote: 'PASS', winRate: '100%', status: 'neutral' },
-    { name: 'Context Engine', accuracy: '39%', pnl: -380, vote: 'HOLD', winRate: '39%', status: 'losing' },
-    { name: 'Breadth Index', accuracy: '45%', pnl: 120, vote: 'BUY', winRate: '45%', status: 'profitable' }
-  ];
+  // Build agent rows from real leaderboard data
+  const leaderboard = data.agentLeaderboard || {};
+  const agentIds = Object.keys(leaderboard);
 
-  body.innerHTML = agents.map(a => {
-    const pnlStr = a.pnl >= 0 ? `+₹${a.pnl}` : `-₹${Math.abs(a.pnl)}`;
-    const voteClass = a.vote === 'BUY' ? 'text-green' : a.vote === 'SELL' ? 'text-red' : 'text-yellow';
-    
-    let rowClass = 'agent-neutral';
-    if (a.pnl > 0) rowClass = 'agent-profitable';
-    else if (a.pnl < 0) rowClass = 'agent-losing';
+  if (agentIds.length > 0) {
+    body.innerHTML = agentIds.map(id => {
+      const a = leaderboard[id];
+      const pnl = ((a.actualProfitContribution || 0) - (a.actualLossContribution || 0));
+      const pnlStr = pnl >= 0 ? `+₹${pnl.toFixed(2)}` : `-₹${Math.abs(pnl).toFixed(2)}`;
+      const weight = ((a.weight || 0) * 100).toFixed(0);
+      const vote = a.last_signal || 'HOLD';
+      const voteClass = vote === 'BUY' ? 'text-green' : vote === 'SELL' ? 'text-red' : 'text-yellow';
 
-    return `
-      <tr class="${rowClass}">
-        <td><b>${a.name}</b></td>
-        <td>${a.winRate}</td>
-        <td class="${voteClass} font-semibold">${a.vote}</td>
-        <td class="${a.pnl >= 0 ? 'text-green' : 'text-red'} font-semibold">${pnlStr}</td>
-      </tr>
-    `;
-  }).join('');
+      let rowClass = 'agent-neutral';
+      if (pnl > 0) rowClass = 'agent-profitable';
+      else if (pnl < 0) rowClass = 'agent-losing';
+
+      return `
+        <tr class="${rowClass}">
+          <td><b>${id}</b></td>
+          <td>${weight}%</td>
+          <td class="${voteClass} font-semibold">${vote}</td>
+          <td class="${pnl >= 0 ? 'text-green' : 'text-red'} font-semibold">${pnlStr}</td>
+        </tr>
+      `;
+    }).join('');
+  } else {
+    body.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-secondary);">Awaiting agent leaderboard data...</td></tr>';
+  }
 }
 
 // ----------------------------------------------------
@@ -960,27 +946,29 @@ function updateProviderHealthDashboard(health) {
   if (!body) return;
 
   const defaultHealth = {
-    Gemini: { latency: 120, successRate: 100, errors: 0, lastResponse: '200 OK' },
-    Groq: { latency: 85, successRate: 100, errors: 0, lastResponse: '200 OK' },
-    OpenAI: { latency: 150, successRate: 100, errors: 0, lastResponse: '200 OK' },
-    Yahoo: { latency: 310, successRate: 98, errors: 0, lastResponse: '200 OK' },
-    Kite: { latency: 45, successRate: 100, errors: 0, lastResponse: '200 OK' },
-    Telegram: { latency: 180, successRate: 100, errors: 0, lastResponse: '200 OK' },
-    Postgres: { latency: 5, successRate: 100, errors: 0, lastResponse: 'Connected' }
+    Gemini: { latency: null, successRate: null, errors: 0, lastResponse: null },
+    Groq: { latency: null, successRate: null, errors: 0, lastResponse: null },
+    OpenAI: { latency: null, successRate: null, errors: 0, lastResponse: null },
+    Yahoo: { latency: null, successRate: null, errors: 0, lastResponse: null },
+    Kite: { latency: null, successRate: null, errors: 0, lastResponse: null },
+    Telegram: { latency: null, successRate: null, errors: 0, lastResponse: null },
+    Postgres: { latency: null, successRate: null, errors: 0, lastResponse: null }
   };
 
   const activeHealth = health || defaultHealth;
 
   body.innerHTML = Object.keys(activeHealth).map(key => {
     const h = activeHealth[key];
-    const latColor = h.latency < 100 ? 'text-green' : h.latency < 250 ? 'text-yellow' : 'text-red';
-    const successColor = h.successRate > 95 ? 'text-green' : 'text-red';
+    const latDisplay = h.latency !== null ? `${h.latency}ms` : 'N/A';
+    const successDisplay = h.successRate !== null ? `${h.successRate}%` : 'N/A';
+    const latColor = h.latency === null ? 'text-yellow' : h.latency < 100 ? 'text-green' : h.latency < 250 ? 'text-yellow' : 'text-red';
+    const successColor = h.successRate === null ? 'text-yellow' : h.successRate > 95 ? 'text-green' : 'text-red';
 
     return `
       <tr>
         <td><b>${key}</b></td>
-        <td class="monospace font-semibold ${latColor}">${h.latency}ms</td>
-        <td class="monospace ${successColor}">${h.successRate}%</td>
+        <td class="monospace font-semibold ${latColor}">${latDisplay}</td>
+        <td class="monospace ${successColor}">${successDisplay}</td>
         <td class="monospace">${h.failureCount || 0}</td>
         <td class="monospace" style="font-size: 0.65rem;">${h.lastFailure || 'None'}</td>
         <td class="monospace">${h.retryCount || 0}</td>
@@ -1009,21 +997,21 @@ function updateExecutionTimeline(data) {
   if (data.preMarketState) {
     if (data.preMarketState.firstScanCompleted) {
       milestones[1].active = true;
-      milestones[1].time = '09:16';
+      milestones[1].time = '--:--'; // V10.1: Will be driven by real scheduler timestamps
     }
     if (data.preMarketState.firstSignalGenerated) {
       milestones[2].active = true;
-      milestones[2].time = '09:17';
+      milestones[2].time = '--:--'; // V10.1: Will be driven by real scheduler timestamps
     }
     if (data.prediction && data.prediction.participating_models?.agent7_risk?.signal === 'PASS') {
       milestones[3].active = true;
-      milestones[3].time = '09:18';
+      milestones[3].time = '--:--'; // V10.1: Will be driven by real scheduler timestamps
     }
     if (data.preMarketState.firstTradeExecuted) {
       milestones[4].active = true;
-      milestones[4].time = '09:20';
+      milestones[4].time = '--:--'; // V10.1: Will be driven by real scheduler timestamps
       milestones[5].active = true;
-      milestones[5].time = '09:21';
+      milestones[5].time = '--:--'; // V10.1: Will be driven by real scheduler timestamps
     }
   }
 
@@ -1264,7 +1252,7 @@ function appendChartPoint(time, price, ema9Val, ema21Val) {
       high: Math.max(open, price),
       low: Math.min(open, price),
       close: price,
-      volume: 1000 + Math.random() * 5000
+      volume: 0 // V10.1: Volume not available in live tick — connect to data.metrics.scannerStats.lastVolume
     };
     currentCandles.push(newCandle);
   }
@@ -1514,12 +1502,12 @@ function updateChartWithData(candles, indicators = null, consensus = null) {
 
   if (emaTrend === 'BULLISH' && lastRsi > 45 && volumeConfirmation.includes('HIGH')) {
     predictedDirection = 'BUY';
-    probability = Math.round(60 + Math.random() * 25);
-    expectedMove = parseFloat((0.4 + Math.random() * 1.2).toFixed(2));
+    probability = data.prediction ? Math.round((data.prediction.confidence || 0.5) * 100) : 50;
+    expectedMove = data.prediction && data.prediction.reasoning ? 0.0 : 0.0;  // Real value from backend when available
   } else if (emaTrend === 'BEARISH' && lastRsi < 55) {
     predictedDirection = 'SELL';
-    probability = Math.round(55 + Math.random() * 20);
-    expectedMove = parseFloat((0.3 + Math.random() * 1.0).toFixed(2));
+    probability = data.prediction ? Math.round((data.prediction.confidence || 0.5) * 100) : 50;
+    expectedMove = data.prediction && data.prediction.reasoning ? 0.0 : 0.0;  // Real value from backend when available
   }
 
   const expectedTargetPrice = predictedDirection === 'BUY' ? currentPrice * (1 + expectedMove/100) : currentPrice * (1 - expectedMove/100);
@@ -1891,14 +1879,29 @@ function drawHeatmap() {
   if (!container) return;
   
   let html = '';
-  for (let i = 1; i <= 8; i++) {
-    const confidence = 0.5 + Math.random() * 0.4;
-    const color = `rgba(16, 185, 129, ${confidence.toFixed(2)})`;
-    html += `
-      <div style="background: ${color}; border-radius: 4px; padding: 6px; text-align: center; color: black; font-weight: bold;">
-        A${i}<br>${(confidence * 100).toFixed(0)}%
-      </div>
-    `;
+  // V10.1: Connect to real agent confidence from data.agentLeaderboard
+  const heatmapLeaderboard = (typeof data !== 'undefined' && data.agentLeaderboard) ? data.agentLeaderboard : {};
+  const heatmapAgentIds = Object.keys(heatmapLeaderboard);
+  if (heatmapAgentIds.length > 0) {
+    heatmapAgentIds.forEach((id, i) => {
+      const confidence = heatmapLeaderboard[id].weight || 0.5;
+      const color = `rgba(16, 185, 129, ${confidence.toFixed(2)})`;
+      html += `
+        <div style="background: ${color}; border-radius: 4px; padding: 6px; text-align: center; color: black; font-weight: bold;">
+          ${id}<br>${(confidence * 100).toFixed(0)}%
+        </div>
+      `;
+    });
+  } else {
+    for (let i = 1; i <= 8; i++) {
+      const confidence = 0.5; // V10.1: Connect to real agent confidence
+      const color = `rgba(16, 185, 129, ${confidence.toFixed(2)})`;
+      html += `
+        <div style="background: ${color}; border-radius: 4px; padding: 6px; text-align: center; color: black; font-weight: bold;">
+          A${i}<br>${(confidence * 100).toFixed(0)}%
+        </div>
+      `;
+    }
   }
   container.innerHTML = html;
 }

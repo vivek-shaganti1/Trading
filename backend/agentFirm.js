@@ -293,11 +293,12 @@ const agentFirm = {
       });
     }
 
-    if (supporting.length === 0) {
-      supporting = ['Agent 1 (Neural)', 'Agent 4 (Technical)'];
-    }
-    if (opposing.length === 0) {
-      opposing = ['Agent 5 (Context)'];
+    if (supporting.length === 0 && opposing.length === 0) {
+      // No participating_models data available — do NOT fabricate agent names.
+      // Record null attribution with an honest note for audit trails.
+      supporting = [];
+      opposing = [];
+      console.warn(`[AgentFirm] onTradeClosed(${symbol}): No participating_models data. Attribution recorded as null.`);
     }
 
     const marketConditions = { 
