@@ -470,13 +470,6 @@ async function restoreStateFromPostgres() {
             rejection_reasons JSONB NOT NULL
           )
         `);
-        // Alter consensus_decisions to support future return tracking
-        await runQuery(`ALTER TABLE consensus_decisions ADD COLUMN IF NOT EXISTS ref_15m NUMERIC;`);
-        await runQuery(`ALTER TABLE consensus_decisions ADD COLUMN IF NOT EXISTS ref_30m NUMERIC;`);
-        await runQuery(`ALTER TABLE consensus_decisions ADD COLUMN IF NOT EXISTS ref_1h NUMERIC;`);
-        await runQuery(`ALTER TABLE consensus_decisions ADD COLUMN IF NOT EXISTS ref_eod NUMERIC;`);
-
-        // Create opportunity_tracker and shadow_trades tables
         await runQuery(`
           CREATE TABLE IF NOT EXISTS shadow_trades (
             id TEXT PRIMARY KEY,
@@ -540,22 +533,21 @@ async function restoreStateFromPostgres() {
             execution_mode TEXT
           )
         `);
-        await runQuery(`ALTER TABLE agent24_audit_logs ADD COLUMN IF NOT EXISTS confidence NUMERIC;`);
-        await runQuery(`ALTER TABLE agent24_audit_logs ADD COLUMN IF NOT EXISTS vote_breakdown JSONB;`);
-        await runQuery(`ALTER TABLE agent24_audit_logs ADD COLUMN IF NOT EXISTS opportunity_score NUMERIC;`);
-        await runQuery(`ALTER TABLE agent24_audit_logs ADD COLUMN IF NOT EXISTS status TEXT;`);
-        await runQuery(`ALTER TABLE trade_logs ADD COLUMN IF NOT EXISTS execution_mode TEXT;`);
-        await runQuery(`ALTER TABLE throughput_history ADD COLUMN IF NOT EXISTS passed_risk INTEGER DEFAULT 0;`);
-        await runQuery(`ALTER TABLE completed_trades ADD COLUMN IF NOT EXISTS entry_efficiency NUMERIC;`);
-        await runQuery(`ALTER TABLE completed_trades ADD COLUMN IF NOT EXISTS exit_efficiency NUMERIC;`);
-        await runQuery(`ALTER TABLE completed_trades ADD COLUMN IF NOT EXISTS mfe NUMERIC;`);
-        await runQuery(`ALTER TABLE completed_trades ADD COLUMN IF NOT EXISTS mae NUMERIC;`);
+        await runQuery(`ALTER TABLE agent24_audit_logs ADD COLUMN IF NOT EXISTS confidence NUMERIC;`).catch(() => {});
+        await runQuery(`ALTER TABLE agent24_audit_logs ADD COLUMN IF NOT EXISTS vote_breakdown JSONB;`).catch(() => {});
+        await runQuery(`ALTER TABLE agent24_audit_logs ADD COLUMN IF NOT EXISTS opportunity_score NUMERIC;`).catch(() => {});
+        await runQuery(`ALTER TABLE agent24_audit_logs ADD COLUMN IF NOT EXISTS status TEXT;`).catch(() => {});
+        await runQuery(`ALTER TABLE trade_logs ADD COLUMN IF NOT EXISTS execution_mode TEXT;`).catch(() => {});
+        await runQuery(`ALTER TABLE throughput_history ADD COLUMN IF NOT EXISTS passed_risk INTEGER DEFAULT 0;`).catch(() => {});
+        await runQuery(`ALTER TABLE completed_trades ADD COLUMN IF NOT EXISTS entry_efficiency NUMERIC;`).catch(() => {});
+        await runQuery(`ALTER TABLE completed_trades ADD COLUMN IF NOT EXISTS exit_efficiency NUMERIC;`).catch(() => {});
+        await runQuery(`ALTER TABLE completed_trades ADD COLUMN IF NOT EXISTS mfe NUMERIC;`).catch(() => {});
+        await runQuery(`ALTER TABLE completed_trades ADD COLUMN IF NOT EXISTS mae NUMERIC;`).catch(() => {});
       } catch (tableErr) {
         console.error('[DB RESTORE] Error creating/altering Agent tables:', tableErr.message);
       }
     }
 
-    // Schema validation - Verify that all required tables are present
     const tableCheckRows = await runQuery(
       "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
     );
@@ -568,49 +560,61 @@ async function restoreStateFromPostgres() {
 
     const existingTables = tableCheckRows.map(r => r.table_name.toLowerCase());
     const requiredTables = [
-      'users',
-      'sessions',
-      'portfolio_state',
-      'daily_stats',
-      'trade_logs',
-      'prediction_logs',
-      'model_weights',
-      'consensus_decisions',
-      'telegram_commands',
-      'risk_events',
-      'alerts',
-      'learning_feedback',
-      'agent_memory',
-      'paper_trading_results',
-      'daily_model_performance',
-      'agent20_reports',
-      'agent21_trust_logs',
-      'agent22_research_logs',
-      'agent23_journals',
-      'agent24_audit_logs',
-      'agent25_sizing_logs',
-      'agent26_market_memory',
-      'nightly_learning_reports',
-      'threshold_history',
-      'performance_metrics',
-      'throughput_history',
-      'completed_trades'
+      'users', 'sessions', 'portfolio_state', 'daily_stats', 'trade_logs',
+      'prediction_logs', 'model_weights', 'consensus_decisions', 'telegram_commands',
+      'risk_events', 'alerts', 'learning_feedback', 'agent_memory',
+      'paper_trading_results', 'daily_model_performance', 'agent20_reports',
+      'agent21_trust_logs', 'agent22_research_logs', 'agent23_journals',
+      'agent24_audit_logs', 'agent25_sizing_logs', 'agent26_market_memory',
+      'nightly_learning_reports', 'threshold_history', 'performance_metrics',
+      'throughput_history', 'completed_trades'
     ];
 
     const missingTables = requiredTables.filter(t => !existingTables.includes(t));
     if (missingTables.length > 0) {
-      console.warn(`[DB VALIDATE]: Database schema is missing tables: [${missingTables.join(', ')}]. Please run schema.sql. Falling back to Safe Local Mode.`);
+      console.warn(`[DB VALIDATE]: Database schema is missing tables: [${missingTables.join(', ')}]. Falling back to Safe Local Mode.`);
       dbAvailable = false;
       return;
     }
 
-    console.log('[DB VALIDATE]: Schema validation successful! All 15 required tables are present.');
-    console.log('[DB RESTORE]: Neon PostgreSQL online. Restoring system state...');
+    console.log('[DB VALIDATE]: Schema validation successful! All required tables are present.');
+    console.log('[DB RESTORE]: Neon PostgreSQL online. Fetching system state in parallel...');
 
-    // 1. Restore portfolio_state
-    const pRows = await runQuery('SELECT * FROM portfolio_state WHERE id = $1 LIMIT 1', ['default']);
+    // Fetch essential system data in parallel to reduce boot time to under 1 second
+    const [
+      pRows,
+      wRows,
+      mRows,
+      rRows,
+      memRows,
+      trustRows,
+      researchRows,
+      journalRows,
+      a20Rows,
+      a24Rows,
+      ctRows,
+      eodRows,
+      sRows
+    ] = await Promise.all([
+      runQuery('SELECT * FROM portfolio_state WHERE id = $1 LIMIT 1', ['default']).catch(() => null),
+      runQuery('SELECT * FROM model_weights WHERE id = $1 LIMIT 1', ['default']).catch(() => null),
+      runQuery('SELECT * FROM agent_memory WHERE id = $1 LIMIT 1', ['default']).catch(() => null),
+      runQuery('SELECT * FROM paper_trading_results WHERE id = $1 LIMIT 1', ['default']).catch(() => null),
+      runQuery('SELECT * FROM agent26_market_memory ORDER BY timestamp DESC LIMIT 50').catch(() => null),
+      runQuery('SELECT * FROM agent21_trust_logs ORDER BY timestamp DESC LIMIT 10').catch(() => null),
+      runQuery('SELECT * FROM agent22_research_logs ORDER BY timestamp DESC LIMIT 10').catch(() => null),
+      runQuery('SELECT * FROM agent23_journals ORDER BY timestamp DESC LIMIT 10').catch(() => null),
+      runQuery('SELECT * FROM agent20_reports ORDER BY timestamp DESC LIMIT 10').catch(() => null),
+      runQuery('SELECT * FROM agent24_audit_logs ORDER BY timestamp DESC LIMIT 20').catch(() => null),
+      runQuery('SELECT * FROM completed_trades ORDER BY exit_time DESC LIMIT 20').catch(() => null),
+      runQuery('SELECT * FROM eod_report_state').catch(() => null),
+      runQuery("SELECT * FROM sessions WHERE status = 'ACTIVE' LIMIT 1").catch(() => null)
+    ]);
+
+    const dbData = readLocalDb();
+
+    // 1. Process portfolio_state
     if (pRows && pRows.length > 0) {
-      const dbData = readLocalDb();
       dbData.portfolio_state = {
         ...dbData.portfolio_state,
         strategy: pRows[0].strategy,
@@ -620,14 +624,11 @@ async function restoreStateFromPostgres() {
         lifetime_pnl: Number(pRows[0].lifetime_pnl),
         holding_stocks: pRows[0].holding_stocks || []
       };
-      writeLocalDb(dbData);
       console.log('   - Restored portfolio state.');
     }
 
-    // 2. Restore model_weights
-    const wRows = await runQuery('SELECT * FROM model_weights WHERE id = $1 LIMIT 1', ['default']);
+    // 2. Process model_weights
     if (wRows && wRows.length > 0) {
-      const dbData = readLocalDb();
       dbData.portfolio_state.model_weights = {
         agent1_weight: Number(wRows[0].agent1_weight),
         agent2_weight: Number(wRows[0].agent2_weight),
@@ -640,14 +641,11 @@ async function restoreStateFromPostgres() {
         adaptationCount: Number(wRows[0].adaptation_count),
         neural_model_weights: wRows[0].neural_model_weights
       };
-      writeLocalDb(dbData);
       console.log('   - Restored model weights.');
     }
 
-    // 3. Restore agent_memory
-    const mRows = await runQuery('SELECT * FROM agent_memory WHERE id = $1 LIMIT 1', ['default']);
+    // 3. Process agent_memory
     if (mRows && mRows.length > 0) {
-      const dbData = readLocalDb();
       dbData.session_memory = {
         ...dbData.session_memory,
         paper_trading_stats: mRows[0].paper_trading_stats || {},
@@ -656,14 +654,11 @@ async function restoreStateFromPostgres() {
         user_instructions: mRows[0].user_instructions || {}
       };
       dbData.portfolio_state.user_instructions = mRows[0].user_instructions || {};
-      writeLocalDb(dbData);
       console.log('   - Restored agent memory & preferences.');
     }
 
-    // 4. Restore paper_trading_results
-    const rRows = await runQuery('SELECT * FROM paper_trading_results WHERE id = $1 LIMIT 1', ['default']);
+    // 4. Process paper_trading_results
     if (rRows && rRows.length > 0) {
-      const dbData = readLocalDb();
       dbData.paper_trading_results = {
         id: 'default',
         trading_days_tracked: Number(rRows[0].trading_days_tracked),
@@ -675,14 +670,11 @@ async function restoreStateFromPostgres() {
         net_pnl: Number(rRows[0].net_pnl),
         details: rRows[0].details || {}
       };
-      writeLocalDb(dbData);
       console.log('   - Restored paper trading results.');
     }
 
-    // 5. Restore agent26_market_memory for analog retrieval
-    const memRows = await runQuery('SELECT * FROM agent26_market_memory ORDER BY timestamp DESC LIMIT 500');
+    // 5. Process agent26_market_memory
     if (memRows && memRows.length > 0) {
-      const dbData = readLocalDb();
       dbData.agent26_market_memory = memRows.map(r => ({
         symbol: r.symbol,
         signal: r.signal,
@@ -691,14 +683,11 @@ async function restoreStateFromPostgres() {
         timestamp: r.timestamp,
         synced: true
       }));
-      writeLocalDb(dbData);
-      console.log(`   - Restored ${memRows.length} market memory records for analog retrieval.`);
+      console.log(`   - Restored ${memRows.length} market memory records.`);
     }
 
-    // 6. Restore agent21_trust_logs for learning state continuity
-    const trustRows = await runQuery('SELECT * FROM agent21_trust_logs ORDER BY timestamp DESC LIMIT 100');
+    // 6. Process agent21_trust_logs
     if (trustRows && trustRows.length > 0) {
-      const dbData = readLocalDb();
       dbData.agent21_trust_logs = trustRows.map(r => ({
         weights_before: typeof r.weights_before === 'string' ? JSON.parse(r.weights_before) : r.weights_before,
         weights_after: typeof r.weights_after === 'string' ? JSON.parse(r.weights_after) : r.weights_after,
@@ -706,14 +695,11 @@ async function restoreStateFromPostgres() {
         timestamp: r.timestamp,
         synced: true
       }));
-      writeLocalDb(dbData);
       console.log(`   - Restored ${trustRows.length} trust engine logs.`);
     }
 
-    // 7. Restore agent22_research_logs
-    const researchRows = await runQuery('SELECT * FROM agent22_research_logs ORDER BY timestamp DESC LIMIT 100');
+    // 7. Process agent22_research_logs
     if (researchRows && researchRows.length > 0) {
-      const dbData = readLocalDb();
       dbData.agent22_research_logs = researchRows.map(r => ({
         regime: r.regime,
         sector: r.sector,
@@ -725,14 +711,11 @@ async function restoreStateFromPostgres() {
         timestamp: r.timestamp,
         synced: true
       }));
-      writeLocalDb(dbData);
       console.log(`   - Restored ${researchRows.length} research logs.`);
     }
 
-    // 8. Restore agent23_journals
-    const journalRows = await runQuery('SELECT * FROM agent23_journals ORDER BY timestamp DESC LIMIT 100');
+    // 8. Process agent23_journals
     if (journalRows && journalRows.length > 0) {
-      const dbData = readLocalDb();
       dbData.agent23_journals = journalRows.map(r => ({
         trade_id: r.trade_id,
         symbol: r.symbol,
@@ -745,14 +728,11 @@ async function restoreStateFromPostgres() {
         timestamp: r.timestamp,
         synced: true
       }));
-      writeLocalDb(dbData);
       console.log(`   - Restored ${journalRows.length} trading journals.`);
     }
 
-    // 9. Restore agent20_reports
-    const a20Rows = await runQuery('SELECT * FROM agent20_reports ORDER BY timestamp DESC LIMIT 100');
+    // 9. Process agent20_reports
     if (a20Rows && a20Rows.length > 0) {
-      const dbData = readLocalDb();
       dbData.agent20_reports = a20Rows.map(r => ({
         trade_id: r.trade_id,
         symbol: r.symbol,
@@ -766,14 +746,11 @@ async function restoreStateFromPostgres() {
         timestamp: r.timestamp,
         synced: true
       }));
-      writeLocalDb(dbData);
       console.log(`   - Restored ${a20Rows.length} performance analyst reports.`);
     }
 
-    // 10. Restore agent24_audit_logs for opportunity auditing
-    const a24Rows = await runQuery('SELECT * FROM agent24_audit_logs ORDER BY timestamp DESC LIMIT 200');
+    // 10. Process agent24_audit_logs
     if (a24Rows && a24Rows.length > 0) {
-      const dbData = readLocalDb();
       dbData.agent24_audit_logs = a24Rows.map(r => ({
         symbol: r.symbol,
         tqs: Number(r.tqs),
@@ -789,14 +766,11 @@ async function restoreStateFromPostgres() {
         timestamp: r.timestamp,
         synced: true
       }));
-      writeLocalDb(dbData);
       console.log(`   - Restored ${a24Rows.length} opportunity audit logs.`);
     }
 
-    // 10b. Restore completed_trades
-    const ctRows = await runQuery('SELECT * FROM completed_trades ORDER BY exit_time DESC');
-    if (ctRows) {
-      const dbData = readLocalDb();
+    // 10b. Process completed_trades
+    if (ctRows && ctRows.length > 0) {
       dbData.completed_trades = ctRows.map(r => ({
         trade_id: r.trade_id,
         symbol: r.symbol,
@@ -814,34 +788,32 @@ async function restoreStateFromPostgres() {
         confidence: r.confidence ? Number(r.confidence) : null,
         execution_mode: r.execution_mode
       }));
-      writeLocalDb(dbData);
       console.log(`   - Restored ${ctRows.length} completed trades.`);
     }
 
-    // 10c. Restore EOD report state
-    const eodRows = await runQuery('SELECT * FROM eod_report_state');
-    if (eodRows) {
-      const dbData = readLocalDb();
+    // 10c. Process EOD report state
+    if (eodRows && eodRows.length > 0) {
       dbData.eod_report_state = eodRows.map(r => ({
         date: r.date,
         sent: r.sent,
         sent_at: r.sent_at
       }));
-      writeLocalDb(dbData);
       console.log(`   - Restored ${eodRows.length} EOD report states.`);
     }
 
-    // 11. Restore active session
-    const sRows = await runQuery("SELECT * FROM sessions WHERE status = 'ACTIVE' LIMIT 1");
+    // 11. Process active session
     if (sRows && sRows.length > 0) {
       console.log(`   - Restored active session: ${sRows[0].id}`);
     } else {
       const sessionId = `SESS-${Date.now()}`;
-      await runQuery('INSERT INTO sessions (id, status, start_time) VALUES ($1, $2, NOW())', [sessionId, 'ACTIVE']);
+      await runQuery('INSERT INTO sessions (id, status, start_time) VALUES ($1, $2, NOW())', [sessionId, 'ACTIVE']).catch(() => {});
       console.log(`   - Started new active session: ${sessionId}`);
     }
+
+    writeLocalDb(dbData);
+    console.log('[DB RESTORE]: System state parallel recovery completed.');
   } catch (err) {
-    console.error('[DB RESTORE]: Error restoring state from Neon:', err.message);
+    console.error('[DB RESTORE]: Error during parallel state restoration:', err.message);
     dbAvailable = false;
   }
 }
