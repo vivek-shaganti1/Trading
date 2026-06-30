@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const db = require('./db');
 const config = require('../shared/config');
 const marketData = require('./marketData');
+const { withResilience } = require('./resilience');
 
 // Yahoo Finance Mappings
 const YAHOO_MAPPINGS = {
@@ -140,7 +141,7 @@ async function fetchRealPrices(force = false) {
     lastApiUrlCalled = url;
     
     try {
-      const response = await fetch(url);
+      const response = await withResilience('broker', async () => await fetch(url), 3, 500);
       if (!response.ok) return;
       const data = await response.json();
       const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
@@ -173,14 +174,14 @@ async function verifyKiteSession() {
   const url = 'https://api.kite.trade/user/margins';
   lastApiUrlCalled = url;
 
-  const response = await fetch(url, {
+  const response = await withResilience('broker', async () => await fetch(url, {
     method: 'GET',
     headers: {
       'X-Kite-Version': '3',
       'Authorization': `token ${config.KITE_API_KEY}:${config.KITE_ACCESS_TOKEN}`,
       'Accept': 'application/json'
     }
-  });
+  }), 3, 500);
 
   const resData = await response.json();
   if (resData.status === 'success') {
@@ -203,7 +204,7 @@ async function loginAngelOne() {
   const url = 'https://apiconnect.angelone.in/rest/auth/angelone/user/v1/loginByPassword';
   lastApiUrlCalled = url;
 
-  const response = await fetch(url, {
+  const response = await withResilience('broker', async () => await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -220,7 +221,7 @@ async function loginAngelOne() {
       password: config.SMARTAPI_PASSWORD,
       totp: totp
     })
-  });
+  }), 3, 500);
 
   const resData = await response.json();
   if (resData.status && resData.data) {
@@ -254,11 +255,11 @@ async function loginShoonya() {
     appkey: config.SHOONYA_API_KEY
   };
 
-  const response = await fetch(url, {
+  const response = await withResilience('broker', async () => await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: 'jData=' + JSON.stringify(payload)
-  });
+  }), 3, 500);
 
   const resData = await response.json();
   if (resData.stat === 'Ok') {
@@ -428,7 +429,7 @@ const broker = {
       try {
         const yahooSymbol = YAHOO_MAPPINGS[symbol] || `${symbol}.NS`;
         const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1m&range=1d`;
-        const res = await fetch(url);
+        const res = await withResilience('broker', async () => await fetch(url), 3, 500);
         if (res.ok) {
           const data = await res.json();
           const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
@@ -505,7 +506,7 @@ const broker = {
           formBody.push(encodedKey + "=" + encodedValue);
         }
 
-        const res = await fetch(url, {
+        const res = await withResilience('broker', async () => await fetch(url, {
           method: 'POST',
           headers: {
             'X-Kite-Version': '3',
@@ -513,7 +514,7 @@ const broker = {
             'Content-Type': 'application/x-www-form-urlencoded'
           },
           body: formBody.join("&")
-        });
+        }), 3, 500);
         const orderRes = await res.json();
         console.log(`[BROKER] Zerodha Kite Order placed status: ${orderRes.status}`);
       } catch (err) {
@@ -525,7 +526,7 @@ const broker = {
       try {
         const url = 'https://apiconnect.angelone.in/rest/secure/angelone/order/v1/placeOrder';
         lastApiUrlCalled = url;
-        const res = await fetch(url, {
+        const res = await withResilience('broker', async () => await fetch(url, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${angelSession.jwtToken}`,
@@ -546,7 +547,7 @@ const broker = {
             duration: 'DAY',
             qty: String(Math.max(1, Math.round(quantity)))
           })
-        });
+        }), 3, 500);
         const orderRes = await res.json();
         console.log(`[BROKER] Angel One Order placed: ${orderRes.message}`);
       } catch (err) {
@@ -569,11 +570,11 @@ const broker = {
           prctyp: 'MKT',
           ret: 'DAY'
         };
-        const res = await fetch(url, {
+        const res = await withResilience('broker', async () => await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: 'jData=' + JSON.stringify(payload)
-        });
+        }), 3, 500);
         const orderRes = await res.json();
         console.log(`[BROKER] Shoonya Order placed: ${orderRes.stat}`);
       } catch (err) {
@@ -725,12 +726,12 @@ const broker = {
       try {
         const url = 'https://api.kite.trade/user/margins';
         lastApiUrlCalled = url;
-        const res = await fetch(url, {
+        const res = await withResilience('broker', async () => await fetch(url, {
           headers: {
             'X-Kite-Version': '3',
             'Authorization': `token ${config.KITE_API_KEY}:${config.KITE_ACCESS_TOKEN}`
           }
-        });
+        }), 3, 500);
         const fundData = await res.json();
         if (fundData.status === 'success' && fundData.data) {
           balance = parseFloat(fundData.data.equity.net || balance);
@@ -742,7 +743,7 @@ const broker = {
       try {
         const url = 'https://apiconnect.angelone.in/rest/secure/angelone/margin/v1/funds';
         lastApiUrlCalled = url;
-        const res = await fetch(url, {
+        const res = await withResilience('broker', async () => await fetch(url, {
           headers: {
             'Authorization': `Bearer ${angelSession.jwtToken}`,
             'Content-Type': 'application/json',
@@ -751,7 +752,7 @@ const broker = {
             'X-SourceID': 'WEB',
             'X-PrivateKey': config.SMARTAPI_API_KEY
           }
-        });
+        }), 3, 500);
         const fundData = await res.json();
         if (fundData.status && fundData.data) {
           balance = parseFloat(fundData.data.netrange || fundData.data.availablecash || balance);
@@ -763,14 +764,14 @@ const broker = {
       try {
         const url = 'https://api.shoonya.com/NorenWsev/Limits';
         lastApiUrlCalled = url;
-        const res = await fetch(url, {
+        const res = await withResilience('broker', async () => await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: 'jData=' + JSON.stringify({
             uid: config.SHOONYA_USER_ID,
             actid: shoonyaSession.actid
           })
-        });
+        }), 3, 500);
         const limitData = await res.json();
         if (limitData.stat === 'Ok') {
           balance = parseFloat(limitData.cash || balance);

@@ -954,8 +954,8 @@ const tradingBot = {
       'services.telegram': tgStatus,
       'services.scanner': isTicking ? 'ACTIVE' : 'PAUSED',
       'services.scheduler': 'ACTIVE',
-      'market.status': debugData.marketStatus || (isMarketOpenWindow() ? 'OPEN' : 'CLOSED'),
-      'market.isOpen': isMarketOpenWindow(),
+      'market.status': debugData.marketStatus || (this.isMarketOpenWindow() ? 'OPEN' : 'CLOSED'),
+      'market.isOpen': this.isMarketOpenWindow(),
       'market.currentDate': preMarketState.currentDate,
       'market.preMarketInitialized': preMarketState.preMarketInitialized,
       'market.finalCheckPassed': preMarketState.finalCheckPassed,
@@ -1113,8 +1113,19 @@ const tradingBot = {
   },
 
   isMarketOpenWindow(timeInfo) {
+    if (!timeInfo) {
+      const now = new Date();
+      const istTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+      timeInfo = {
+        day: istTime.getDay(),
+        hours: istTime.getHours(),
+        minutes: istTime.getMinutes(),
+        seconds: istTime.getSeconds(),
+        dateStr: `${istTime.getFullYear()}-${String(istTime.getMonth()+1).padStart(2, '0')}-${String(istTime.getDate()).padStart(2, '0')}`
+      };
+    }
     if (timeInfo.day === 0 || timeInfo.day === 6) return false;
-    if (isHoliday(timeInfo.dateStr)) return false;
+    if (typeof isHoliday === 'function' && isHoliday(timeInfo.dateStr)) return false;
     const currentMins = timeInfo.hours * 60 + timeInfo.minutes;
     return currentMins >= 9 * 60 + 15 && currentMins < 15 * 60 + 30; // Strictly 9:15 AM to 3:30 PM IST
   },
@@ -1422,6 +1433,14 @@ const tradingBot = {
     }
     const currentMins = timeInfo.hours * 60 + timeInfo.minutes;
 
+    if (currentMins < 9 * 60 || currentMins >= 15 * 60 + 30) {
+      if (currentMins >= 15 * 60 + 30 && currentDayStats && currentDayStats.status === 'ACTIVE') {
+        console.log(`[SCHEDULER TRACE] 15:30 IST reached. Finalizing market day...`);
+        await this.finalizeMarketDay(timeInfo.dateStr);
+      }
+      return; // Blocker 8: Outside trading hours -> No broker polling, no APIs, no scanning.
+    }
+
     // Daily reset check: if dateStr has changed since last processed tick, reset preMarketState
     if (!preMarketState.currentDate || preMarketState.currentDate !== timeInfo.dateStr) {
       console.log(`[SCHEDULER] New trading day detected: ${timeInfo.dateStr}. Resetting pre-market state and resuming entries.`);
@@ -1724,10 +1743,6 @@ const tradingBot = {
     if (this.isMarketOpenWindow(timeInfo) && currentMins % 30 === 0 && lastStatusSentMins !== currentMins) {
       lastStatusSentMins = currentMins;
       await this.sendPeriodicStatusUpdate(timeInfo);
-    }
-
-    if (currentMins >= 15 * 60 + 30) { // Finalize strictly at 15:30 IST (3:30 PM)
-      await this.finalizeMarketDay(timeInfo.dateStr);
     }
   },
 

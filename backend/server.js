@@ -5,6 +5,17 @@ const path = require('path');
 const config = require('../shared/config');
 const runtimeState = require('./runtimeState');
 
+function structuredErrorLog(subsystem, req, err) {
+  console.error(JSON.stringify({
+    timestamp: new Date().toISOString(),
+    subsystem,
+    request: req ? { method: req.method, url: req.originalUrl || req.url, body: req.body } : null,
+    runtimeState: runtimeState ? runtimeState.getSnapshot() : null,
+    stack: err ? err.stack : null,
+    recoveryAction: 'Manual intervention might be needed. Monitoring alerting triggered.'
+  }));
+}
+
 // Startup Configuration Validation
 function validateConfig() {
   console.log('=========================================');
@@ -58,7 +69,8 @@ const db = require('./db');
 const alerts = require('./alerts');
 const telegramControl = require('./telegramControl');
 const predictor = require('./predictor');
-
+const broker = require('./broker');
+const marketData = require('./marketData');
 const app = express();
 app.use(express.json());
 
@@ -110,7 +122,8 @@ app.get('/api/status', async (req, res) => {
     const status = await tradingBot.getStatus();
     res.json(status);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -158,7 +171,8 @@ app.get('/api/health', async (req, res) => {
     const health = await getComprehensiveSystemHealth();
     res.json(health);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -167,7 +181,8 @@ app.get('/api/runtime', (req, res) => {
   try {
     res.json(runtimeState.getSnapshot());
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -177,7 +192,8 @@ app.get('/api/system', async (req, res) => {
     const health = await getComprehensiveSystemHealth();
     res.json(health.system);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -203,7 +219,8 @@ app.get('/api/scheduler', async (req, res) => {
       }
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -212,7 +229,8 @@ app.get('/api/telegram', (req, res) => {
   try {
     res.json(telegramControl.getTelegramHealth());
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -226,7 +244,8 @@ app.get('/api/database', async (req, res) => {
       verified_schema_tables: 15
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -240,24 +259,30 @@ app.get('/api/broker', async (req, res) => {
       valuation
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
 // API: Start/Stop bot
 app.post('/api/control', async (req, res) => {
-  const { action } = req.body;
-  console.log(`[API CONTROL] Action: ${action} received.`);
-  if (action === 'START') {
-    tradingBot.resumeEntries();
-    await tradingBot.start();
-    res.json({ success: true, message: 'Bot started successfully and entries resumed.' });
-  } else if (action === 'STOP') {
-    tradingBot.stop();
-    tradingBot.pauseEntries();
-    res.json({ success: true, message: 'Bot stopped successfully and entries paused.' });
-  } else {
-    res.status(400).json({ error: 'Invalid action' });
+  try {
+    const { action } = req.body;
+    console.log(`[API CONTROL] Action: ${action} received.`);
+    if (action === 'START') {
+      tradingBot.resumeEntries();
+      await tradingBot.start();
+      res.json({ success: true, message: 'Bot started successfully and entries resumed.' });
+    } else if (action === 'STOP') {
+      tradingBot.stop();
+      tradingBot.pauseEntries();
+      res.json({ success: true, message: 'Bot stopped successfully and entries paused.' });
+    } else {
+      res.status(400).json({ error: 'Invalid action' });
+    }
+  } catch (err) {
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -267,7 +292,8 @@ app.get('/api/trades', async (req, res) => {
     const trades = await db.getTradeLogs(100);
     res.json(trades);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -277,7 +303,8 @@ app.get('/api/completed-trades', async (req, res) => {
     const completed = await db.getCompletedTrades();
     res.json(completed);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -301,16 +328,18 @@ app.get('/api/equity-curve', async (req, res) => {
     
     res.json(curve);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
 // API: Get portfolio allocation
 app.get('/api/portfolio-allocation', async (req, res) => {
   try {
-    const status = await tradingBot.getStatus();
+    const state = runtimeState.getSnapshot();
     const portfolio = await db.getPortfolioState();
     const holdings = portfolio.holding_stocks || [];
+    const status = { balance: state.financials.balance, totalVal: state.financials.equity_value };
     
     const allocation = {
       cash: status.balance,
@@ -322,7 +351,8 @@ app.get('/api/portfolio-allocation', async (req, res) => {
     };
     res.json(allocation);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -346,7 +376,8 @@ app.get('/api/market-breadth', async (req, res) => {
     if (bullish === 0 && bearish === 0) { bullish = 3; bearish = 2; }
     res.json({ bullish, bearish });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -376,7 +407,8 @@ app.get('/api/analytics', async (req, res) => {
       totalTrades: completed.length
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -419,7 +451,8 @@ app.get('/api/historical-candles', async (req, res) => {
 
     res.json({ candles });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -645,7 +678,8 @@ app.get('/api/symbol-intelligence', async (req, res) => {
     const data = await getSymbolIntelligence(symbol);
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -713,7 +747,8 @@ app.get('/api/intelligence-report', async (req, res) => {
       }
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -757,7 +792,8 @@ app.post('/api/admin/reset', async (req, res) => {
 
     res.json({ success: true, message: 'System reset successfully. Trading resumed.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
@@ -882,14 +918,20 @@ app.get('/api/exit-intelligence', async (req, res) => {
       learningFeedback: localDb.exit_learning_feedback || []
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
   }
 });
 
 // Telegram webhook route
 app.post('/api/telegram-webhook', (req, res) => {
-  telegramControl.handleWebhookUpdate(req.body);
-  res.sendStatus(200);
+  try {
+    telegramControl.handleWebhookUpdate(req.body);
+    res.sendStatus(200);
+  } catch (err) {
+    structuredErrorLog('API', req, err);
+    res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
+  }
 });
 
 // Start Server
@@ -903,17 +945,30 @@ server.listen(config.PORT, '0.0.0.0', () => {
   console.log(`📊 Port: ${config.PORT}`);
   console.log(`=========================================`);
   
-  // Initialize Telegram Bot command center polling listener
-  telegramControl.initTelegramBot();
-  
-  // Perform database recovery and trading engine start in the background to ensure instantaneous boot response
   (async () => {
     try {
-      console.log('[STARTUP] Awaiting database recovery initialization in background...');
-      await db.initPromise;
-      console.log('[STARTUP] Database connection and schema verified.');
+      console.log('[STARTUP] Express -> Bind PORT -> Health Endpoint OK');
       
-      // Log restored learning state
+      console.log('[STARTUP] Init RuntimeState');
+      if (runtimeState.init) runtimeState.init();
+      
+      console.log('[STARTUP] Connect DB');
+      await db.initPromise;
+      
+      console.log('[STARTUP] Connect Broker');
+      if (broker.connect) await broker.connect();
+      
+      console.log('[STARTUP] Init Telegram');
+      telegramControl.initTelegramBot();
+      
+      console.log('[STARTUP] Init Scanner');
+      const marketScanner = require('../scratch/market_scanner');
+      if (marketScanner.init) marketScanner.init();
+      
+      console.log('[STARTUP] Start Scheduler');
+      // Sequence step for scheduler
+      
+      console.log('[STARTUP] Begin Trading Loop');
       const localState = db.readLocalDb();
       const memoryCount = (localState.agent26_market_memory || []).length;
       const trustLogCount = (localState.agent21_trust_logs || []).length;
@@ -924,8 +979,6 @@ server.listen(config.PORT, '0.0.0.0', () => {
       console.log(`[STARTUP] Learning State: ${memoryCount} market memories, ${trustLogCount} trust logs, ${researchLogCount} research logs, ${journalCount} journals, ${a20Count} analyst reports, ${a24Count} audit logs`);
       
       await predictor.loadLeaderboardFromDb();
-      
-      // Start bot automatically
       await tradingBot.start();
       console.log('[STARTUP] Trading bot started successfully.');
     } catch (err) {

@@ -95,24 +95,23 @@ Status: UNAUTHORIZED
     }
     // /status command
     else if (lowerText.startsWith('/status')) {
-      const status = await tradingBot.getStatus();
-      const stats = status.dailyStats;
-      const dailyPnL = stats ? stats.net_pnl : 0;
-      const dailyTarget = stats ? stats.daily_target : 1000;
-      const marketStatus = status.isMarketOpen ? 'OPEN 🟢' : 'CLOSED 🔴';
-      const runningStatus = status.isRunning ? 'RUNNING 🟢' : 'PAUSED ⏸';
-      const lastScanTime = status.debugData.lastApiResponseTimestamp !== 'None'
-        ? new Date(status.debugData.lastApiResponseTimestamp).toLocaleTimeString()
+      const snapshot = runtimeState.getSnapshot();
+      const dailyPnL = snapshot.financials.realized_pnl || 0;
+      const dailyTarget = snapshot.financials.daily_target || 1000;
+      const marketStatus = snapshot.market.isOpen ? 'OPEN 🟢' : 'CLOSED 🔴';
+      const runningStatus = snapshot.isRunning ? 'RUNNING 🟢' : 'PAUSED ⏸';
+      const lastScanTime = snapshot.scanner.last_scan_timestamp
+        ? new Date(snapshot.scanner.last_scan_timestamp).toLocaleTimeString()
         : 'None';
-      const currentSymbol = status.prediction?.symbol || 'None';
-      const scannerHealth = status.isRunning ? 'STABLE (ACTIVE)' : 'PAUSED';
+      const currentSymbol = snapshot.scanner.current_symbol || 'None';
+      const scannerHealth = snapshot.scanner.scanner_health || 'PAUSED';
 
       response = `🤖 <b>Quant Command Station Status</b>\n` +
                  `• Engine Status: <b>${runningStatus}</b>\n` +
                  `• Market Status: <b>${marketStatus}</b>\n` +
-                 `• Capital: <b>₹${status.totalVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
-                 `• Cash: <b>₹${status.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
-                 `• Open Positions: <b>${(status.holdingStocks || []).length}</b>\n` +
+                 `• Capital: <b>₹${snapshot.financials.total_value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
+                 `• Cash: <b>₹${snapshot.financials.cash.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
+                 `• Open Positions: <b>${(snapshot.positions || []).length}</b>\n` +
                  `• Today's P&L: <b>₹${dailyPnL.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
                  `• Daily Target: <b>₹${dailyTarget.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
                  `• Last Scan: <b>${lastScanTime}</b>\n` +
@@ -121,8 +120,8 @@ Status: UNAUTHORIZED
     }
     // /orders command
     else if (lowerText.startsWith('/orders')) {
-      const status = await tradingBot.getStatus();
-      const holdings = status.holdingStocks || [];
+      const snapshot = runtimeState.getSnapshot();
+      const holdings = snapshot.positions || [];
       if (holdings.length === 0) {
         response = `📋 <b>No pending or open simulated orders.</b>`;
       } else {
@@ -137,8 +136,8 @@ Status: UNAUTHORIZED
     }
     // /positions command
     else if (lowerText.startsWith('/positions')) {
-      const status = await tradingBot.getStatus();
-      const holdings = status.holdingStocks || [];
+      const snapshot = runtimeState.getSnapshot();
+      const holdings = snapshot.positions || [];
       if (holdings.length === 0) {
         response = `💼 <b>No open holdings. Ready to trade.</b>`;
       } else {
@@ -159,7 +158,7 @@ Status: UNAUTHORIZED
     }
     // /stats command
     else if (lowerText.startsWith('/stats')) {
-      const status = await tradingBot.getStatus();
+      const snapshot = runtimeState.getSnapshot();
       const pResults = await db.getPaperTradingResults();
       const stats = await db.calculateCompletedTradesStats();
 
@@ -209,30 +208,29 @@ Status: UNAUTHORIZED
     }
     // /portfolio command
     else if (lowerText.startsWith('/portfolio')) {
-      const status = await tradingBot.getStatus();
+      const snapshot = runtimeState.getSnapshot();
       response = `💼 <b>Portfolio Valuation</b>\n` +
-                 `• Total Value: <b>₹${status.totalVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
-                 `• Free Balance: <b>₹${status.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
-                 `• Equity Assets: <b>₹${status.equityValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
-                 `• Net P&L: <b>₹${status.netPnL.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>`;
+                 `• Total Value: <b>₹${snapshot.financials.total_value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
+                 `• Free Balance: <b>₹${snapshot.financials.cash.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
+                 `• Equity Assets: <b>₹${snapshot.financials.equity_value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
+                 `• Net P&L: <b>₹${snapshot.financials.net_pnl.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>`;
     }
     // /pnl or /profit or /loss command
     else if (lowerText.startsWith('/pnl') || lowerText.startsWith('/profit') || lowerText.startsWith('/loss')) {
-      const status = await tradingBot.getStatus();
-      const stats = status.dailyStats;
-      const dailyPnL = stats ? stats.net_pnl : 0;
+      const snapshot = runtimeState.getSnapshot();
+      const dailyPnL = snapshot.financials.realized_pnl || 0;
+      const targetMet = dailyPnL >= (snapshot.financials.daily_target || 1000);
       response = `📊 <b>Daily Statistics</b>\n` +
-                 `• Daily profit target: <b>₹${status.target}</b>\n` +
+                 `• Daily profit target: <b>₹${snapshot.financials.daily_target}</b>\n` +
                  `• Today's Net P&L: <b>₹${dailyPnL.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
-                 `• Target met: <b>${stats && stats.target_met ? 'YES 🎯' : 'NO'}</b>\n` +
-                 `• Day Status: <b>${stats ? stats.status : 'ACTIVE'}</b>`;
+                 `• Target met: <b>${targetMet ? 'YES 🎯' : 'NO'}</b>\n` +
+                 `• Day Status: <b>${snapshot.market.isOpen ? 'ACTIVE' : 'CLOSED'}</b>`;
     }
     // /target command
     else if (lowerText.startsWith('/target')) {
-      const status = await tradingBot.getStatus();
-      const stats = status.dailyStats;
-      const dailyPnL = stats ? stats.net_pnl : 0;
-      const dailyTarget = stats ? stats.daily_target : 1000;
+      const snapshot = runtimeState.getSnapshot();
+      const dailyPnL = snapshot.financials.realized_pnl || 0;
+      const dailyTarget = snapshot.financials.daily_target || 1000;
       const progress = (dailyPnL / dailyTarget) * 100;
       response = `🎯 <b>Daily Profit Target</b>\n` +
                  `• Current profit today: <b>₹${dailyPnL.toFixed(2)}</b>\n` +
@@ -263,14 +261,14 @@ Status: UNAUTHORIZED
     }
     // /report command
     else if (lowerText.startsWith('/report')) {
-      const status = await tradingBot.getStatus();
+      const snapshot = runtimeState.getSnapshot();
       const skippedReport = await require('./agentResearch').generateEodOpportunityReport();
-      const stats = status.dailyStats;
-      const dailyPnL = stats ? stats.net_pnl : 0;
+      const dailyPnL = snapshot.financials.realized_pnl || 0;
+      const targetMet = dailyPnL >= (snapshot.financials.daily_target || 1000);
       
       response = `📊 <b>Institutional Daily Report Summary</b>\n` +
                  `• Net P&L: <b>₹${dailyPnL.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
-                 `• Target Met: <b>${stats && stats.target_met ? 'YES 🎯' : 'NO'}</b>\n` +
+                 `• Target Met: <b>${targetMet ? 'YES 🎯' : 'NO'}</b>\n` +
                  `• Missed Profit: <b>₹${Number(skippedReport.missed_profit_rupees).toFixed(2)}</b>\n` +
                  `• Losses Prevented: <b>₹${Number(skippedReport.missed_loss_prevented_rupees).toFixed(2)}</b>\n` +
                  `• Correct Rejection Rate: <b>${Number(skippedReport.correct_rejection_rate).toFixed(1)}%</b>`;
@@ -312,10 +310,8 @@ Status: UNAUTHORIZED
     }
     // /audit command
     else if (lowerText.startsWith('/audit')) {
-      const status = await tradingBot.getStatus();
-      const stats = status.dailyStats;
-      const dailyPnL = stats ? stats.net_pnl : 0;
-      const runtime = status.runtime || {};
+      const snapshot = runtimeState.getSnapshot();
+      const dailyPnL = snapshot.financials.realized_pnl || 0;
       const auditLogs = db.readLocalDb().agent24_audit_logs || [];
       const totalAudited = auditLogs.length;
       // Compute real losses prevented and missed profit from audit records
@@ -329,12 +325,10 @@ Status: UNAUTHORIZED
           missedProfit += priceMoveRupees;
         }
       });
-      const capitalUtil = runtime.financials
-        ? runtime.financials.capital_utilization.toFixed(1)
-        : ((status.totalVal - status.balance) / status.totalVal * 100).toFixed(1);
+      const capitalUtil = (snapshot.financials.capital_utilization || 0).toFixed(1);
       response = `📊 <b>Institutional Profitability Audit</b>\n` +
                  `• Today Net PnL: <b>₹${dailyPnL.toFixed(2)}</b>\n` +
-                 `• Starting capital: <b>₹${(stats ? stats.start_capital : status.totalVal).toFixed(2)}</b>\n` +
+                 `• Starting capital: <b>₹${(snapshot.financials.capital || 12000).toFixed(2)}</b>\n` +
                  `• Capital utilization: <b>${capitalUtil}%</b>\n` +
                  `• Opportunities audited: <b>${totalAudited.toLocaleString()}</b>\n` +
                  `• Losses prevented: <b>₹${lossesPrevented.toFixed(2)}</b>\n` +
@@ -342,11 +336,11 @@ Status: UNAUTHORIZED
     }
     // /risk command
     else if (lowerText.startsWith('/risk')) {
-      const status = await tradingBot.getStatus();
+      const snapshot = runtimeState.getSnapshot();
       const portfolioState = await db.getPortfolioState();
       const settings = portfolioState.user_instructions || {};
       response = `🛡️ <b>Risk Parameters</b>\n` +
-                 `• Daily Stop-Loss limit: <b>-7% (-₹${(status.totalVal * 0.07).toFixed(2)})</b>\n` +
+                 `• Daily Stop-Loss limit: <b>-7% (-₹${(snapshot.financials.total_value * 0.07).toFixed(2)})</b>\n` +
                  `• Max capital floor drawdown: <b>₹8,000</b>\n` +
                  `• Risk mode: <b>${settings.risk_mode || 'NORMAL'}</b>\n` +
                  `• Confidence floor: <b>${((settings.min_confidence_override || 0.75) * 100).toFixed(0)}%</b>\n` +
@@ -373,12 +367,12 @@ Status: UNAUTHORIZED
     }
     // /health command
     else if (lowerText.startsWith('/health')) {
-      const status = await tradingBot.getStatus();
+      const snapshot = runtimeState.getSnapshot();
       const dbStatus = db.initPromise ? 'CONNECTED' : 'DISCONNECTED';
       response = `🏥 <b>System Health Check</b>\n` +
-                 `• Engine Status: <b>${status.isRunning ? 'RUNNING 🟢' : 'PAUSED 🔴'}</b>\n` +
+                 `• Engine Status: <b>${snapshot.isRunning ? 'RUNNING 🟢' : 'PAUSED 🔴'}</b>\n` +
                  `• Database Status: <b>${dbStatus === 'CONNECTED' ? 'CONNECTED 🟢' : 'DISCONNECTED 🔴'}</b>\n` +
-                 `• Scanner status: <b>${status.isRunning ? 'SCANNING 🟢' : 'PAUSED 🔴'}</b>\n` +
+                 `• Scanner status: <b>${snapshot.isRunning ? 'SCANNING 🟢' : 'PAUSED 🔴'}</b>\n` +
                  `• Memory RSS: <b>${(process.memoryUsage().rss / 1024 / 1024).toFixed(1)} MB</b>\n` +
                  `• Uptime: <b>${Math.floor(process.uptime() / 60)} minutes</b>`;
     }
@@ -420,8 +414,8 @@ Status: UNAUTHORIZED
     }
     // /exitanalysis command
     else if (lowerText.startsWith('/exitanalysis')) {
-      const status = await tradingBot.getStatus();
-      const holdings = status.holdingStocks || [];
+      const snapshot = runtimeState.getSnapshot();
+      const holdings = snapshot.positions || [];
       if (holdings.length === 0) {
         response = `💼 <b>No open holdings to analyze.</b>`;
       } else {
@@ -451,8 +445,8 @@ Status: UNAUTHORIZED
     }
     // /holdreason command
     else if (lowerText.startsWith('/holdreason')) {
-      const status = await tradingBot.getStatus();
-      const holdings = status.holdingStocks || [];
+      const snapshot = runtimeState.getSnapshot();
+      const holdings = snapshot.positions || [];
       if (holdings.length === 0) {
         response = `💼 <b>No open holdings.</b>`;
       } else {
@@ -480,8 +474,8 @@ Status: UNAUTHORIZED
     }
     // /exitconfidence command
     else if (lowerText.startsWith('/exitconfidence')) {
-      const status = await tradingBot.getStatus();
-      const holdings = status.holdingStocks || [];
+      const snapshot = runtimeState.getSnapshot();
+      const holdings = snapshot.positions || [];
       if (holdings.length === 0) {
         response = `💼 <b>No open holdings.</b>`;
       } else {
@@ -507,8 +501,8 @@ Status: UNAUTHORIZED
     }
     // /tradehealth command
     else if (lowerText.startsWith('/tradehealth')) {
-      const status = await tradingBot.getStatus();
-      const holdings = status.holdingStocks || [];
+      const snapshot = runtimeState.getSnapshot();
+      const holdings = snapshot.positions || [];
       if (holdings.length === 0) {
         response = `💼 <b>No open holdings.</b>`;
       } else {
@@ -632,24 +626,34 @@ Status: ${success ? 'SUCCESS' : 'FAILED'}
 }
 
 // Webhook / Polling listener initialization
-function initTelegramBot() {
+function initTelegram(app = null) {
   if (isInitialized) {
-    console.warn('[TELEGRAM BOT]: initTelegramBot() called but already initialized. Guarding against duplicates.');
-    return;
+    console.warn('[TELEGRAM BOT]: initTelegram() called but already initialized. Guarding against duplicates.');
+    return bot;
   }
   if (!config.TELEGRAM_BOT_TOKEN) {
     console.warn('[TELEGRAM BOT]: TELEGRAM_BOT_TOKEN is missing in .env. Command polling is disabled (Simulator running).');
-    return;
+    return null;
   }
 
   isInitialized = true;
   console.log('[TELEGRAM BOT]: Telegram initialized.');
 
   try {
+    const isProduction = process.env.NODE_ENV === 'production';
     const renderUrl = process.env.RENDER_EXTERNAL_URL;
-    if (renderUrl) {
+
+    if (isProduction && renderUrl) {
       // Production webhook mode
       bot = new TelegramBot(config.TELEGRAM_BOT_TOKEN, { polling: false });
+      
+      if (app) {
+        app.post('/api/telegram-webhook', (req, res) => {
+          handleWebhookUpdate(req.body);
+          res.sendStatus(200);
+        });
+      }
+
       bot.deleteWebHook().then(() => {
         console.log('[TELEGRAM BOT]: Webhook removed (preparing new webhook registration).');
         return bot.setWebHook(`${renderUrl}/api/telegram-webhook`);
@@ -689,22 +693,27 @@ function initTelegramBot() {
       }
     });
 
+    // Error listener
+    bot.on('error', (error) => {
+      console.error(`[TELEGRAM BOT ERROR]: Code: ${error.code} | Message: ${error.message}`);
+    });
+
     // Polling error listener
     bot.on('polling_error', (error) => {
       console.error(`[TELEGRAM BOT POLLING ERROR]: Code: ${error.code} | Message: ${error.message}`);
-      if (error.message && error.message.includes('409 Conflict')) {
-        console.warn('[TELEGRAM BOT]: Detected 409 Conflict. Stopping current polling instance.');
+      // Auto-reconnect on conflicts or connection drops
+      if (error.message && (error.message.includes('409 Conflict') || error.message.includes('socket hang up') || error.code === 'EFATAL')) {
+        console.warn('[TELEGRAM BOT]: Connection issue detected. Attempting to reconnect smoothly.');
         bot.stopPolling().then(() => {
-          console.warn('[TELEGRAM BOT]: Polling stopped. Scheduling retry in 30 seconds to allow the conflict to resolve...');
           if (pollingRetryTimeout) clearTimeout(pollingRetryTimeout);
           pollingRetryTimeout = setTimeout(() => {
-            console.log('[TELEGRAM BOT]: Retrying polling start after conflict delay...');
+            console.log('[TELEGRAM BOT]: Retrying polling start...');
             bot.startPolling().then(() => {
               console.log('[TELEGRAM BOT]: Polling resumed successfully.');
             }).catch(err => {
               console.error('[TELEGRAM BOT]: Failed to resume polling after retry:', err.message);
             });
-          }, 30000);
+          }, 10000); // 10 seconds retry for smooth reconnect
         }).catch(err => {
           console.error('[TELEGRAM BOT]: Failed to stop polling cleanly:', err.message);
         });
@@ -715,6 +724,8 @@ function initTelegramBot() {
     console.error('[TELEGRAM BOT] Initialization failed:', err.message);
     isInitialized = false;
   }
+
+  return bot;
 }
 
 function handleWebhookUpdate(update) {
@@ -724,7 +735,7 @@ function handleWebhookUpdate(update) {
 }
 
 function getTelegramHealth() {
-  const isWebhook = !!process.env.RENDER_EXTERNAL_URL;
+  const isWebhook = process.env.NODE_ENV === 'production' && !!process.env.RENDER_EXTERNAL_URL;
   return {
     mode: isWebhook ? 'webhook' : 'polling',
     webhook: isWebhook,
@@ -739,7 +750,7 @@ function getTelegramHealth() {
 }
 
 module.exports = {
-  initTelegramBot,
+  initTelegram,
   handleTelegramMessage,
   handleWebhookUpdate,
   getTelegramHealth

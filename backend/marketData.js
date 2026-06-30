@@ -47,6 +47,8 @@ function enqueueRequest(fetchFunction) {
   });
 }
 
+const { withResilience } = require('./resilience');
+
 async function processRequestQueue() {
   if (isQueueProcessing || requestQueue.length === 0) return;
   isQueueProcessing = true;
@@ -55,7 +57,7 @@ async function processRequestQueue() {
     const { fetchFunction, resolve, reject } = requestQueue.shift();
     try {
       checkRequestBudget();
-      const result = await fetchFunction();
+      const result = await withResilience('yahoo', fetchFunction, 3, 500);
       resolve(result);
     } catch (err) {
       reject(err);

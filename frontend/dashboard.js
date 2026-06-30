@@ -263,30 +263,32 @@ function updateUI(data) {
   const statBalanceEl = document.getElementById('stat-balance');
   const statEquityEl = document.getElementById('stat-equity');
 
-  if (statTotalValEl) statTotalValEl.innerText = '₹' + Number(data.totalVal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (statBalanceEl) statBalanceEl.innerText = '₹' + Number(data.balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (statEquityEl) statEquityEl.innerText = '₹' + Number(data.equityValue).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (statTotalValEl) statTotalValEl.innerText = '₹' + Number(data.totalVal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (statBalanceEl) statBalanceEl.innerText = '₹' + Number(data.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (statEquityEl) statEquityEl.innerText = '₹' + Number(data.equityValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const pnlPercent = ((data.netPnL / (data.totalVal || data.balance || 1)) * 100).toFixed(2);
-  const pnlPrefix = data.netPnL >= 0 ? '+' : '';
+  const netPnL = data.netPnL || 0;
+  const pnlPercent = ((netPnL / (data.totalVal || data.balance || 1)) * 100).toFixed(2);
+  const pnlPrefix = netPnL >= 0 ? '+' : '';
   if (statNetPnLEl) {
-    statNetPnLEl.innerText = `${pnlPrefix}₹${Number(data.netPnL).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${pnlPrefix}${pnlPercent}%)`;
-    statNetPnLEl.className = data.netPnL >= 0 ? 'pnl-badge positive' : 'pnl-badge negative';
+    statNetPnLEl.innerText = `${pnlPrefix}₹${Number(netPnL).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${pnlPrefix}${pnlPercent}%)`;
+    statNetPnLEl.className = netPnL >= 0 ? 'pnl-badge positive' : 'pnl-badge negative';
   }
 
   // Daily Target Math & Reachability calculator (Phase 9)
   const todayProfit = data.dailyStats ? data.dailyStats.net_pnl : 0;
-  const progressPercent = Math.max(0, Math.min(100, (todayProfit / data.target) * 100));
+  const targetVal = data.target || 1;
+  const progressPercent = Math.max(0, Math.min(100, (todayProfit / targetVal) * 100));
   
-  if (targetFraction) targetFraction.innerText = `₹${Math.round(todayProfit)} / ₹${data.target}`;
+  if (targetFraction) targetFraction.innerText = `₹${Math.round(todayProfit)} / ₹${data.target || 0}`;
   if (targetProgressBar) targetProgressBar.style.width = `${progressPercent}%`;
 
   if (data.targetEngineState) {
-    if (targetRemaining) targetRemaining.innerText = `₹${Number(data.targetEngineState.remainingTarget).toFixed(2)}`;
-    if (targetRequiredProfit) targetRequiredProfit.innerText = `₹${Number(data.targetEngineState.requiredExpectedProfit).toFixed(2)}`;
-    if (targetRequiredTrades) targetRequiredTrades.innerText = data.targetEngineState.requiredTradeCount;
-    if (targetRequiredWinrate) targetRequiredWinrate.innerText = `${data.targetEngineState.requiredWinRate}%`;
-    if (targetCapitalUtilization) targetCapitalUtilization.innerText = `${data.targetEngineState.requiredCapitalUtilization}%`;
+    if (targetRemaining) targetRemaining.innerText = `₹${Number(data.targetEngineState.remainingTarget || 0).toFixed(2)}`;
+    if (targetRequiredProfit) targetRequiredProfit.innerText = `₹${Number(data.targetEngineState.requiredExpectedProfit || 0).toFixed(2)}`;
+    if (targetRequiredTrades) targetRequiredTrades.innerText = data.targetEngineState.requiredTradeCount || 0;
+    if (targetRequiredWinrate) targetRequiredWinrate.innerText = `${data.targetEngineState.requiredWinRate || 0}%`;
+    if (targetCapitalUtilization) targetCapitalUtilization.innerText = `${data.targetEngineState.requiredCapitalUtilization || 0}%`;
   }
 
   // Target Reachability calculations
@@ -371,20 +373,20 @@ function updateUI(data) {
   if (data.metrics) {
     const m = data.metrics;
     if (todayNetPnL && m.today) {
-      todayNetPnL.innerText = '₹' + Number(m.today.netPnL).toLocaleString('en-IN', { minimumFractionDigits: 2 });
-      todayNetPnL.style.color = m.today.netPnL >= 0 ? '#10b981' : '#ef4444';
+      todayNetPnL.innerText = '₹' + Number(m.today.netPnL || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      todayNetPnL.style.color = (m.today.netPnL || 0) >= 0 ? '#10b981' : '#ef4444';
     }
-    if (todayTotalTrades && m.today) todayTotalTrades.innerText = m.today.trades;
-    if (todayWinRate && m.today) todayWinRate.innerText = Number(m.today.winRate).toFixed(1) + '%';
-    if (todayFees && m.today) todayFees.innerText = '₹' + Number(m.today.fees).toLocaleString('en-IN', { minimumFractionDigits: 2 });
-    if (todayVolume && m.today) todayVolume.innerText = '₹' + Number(m.today.volume).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    if (todayTotalTrades && m.today) todayTotalTrades.innerText = m.today.trades || 0;
+    if (todayWinRate && m.today) todayWinRate.innerText = Number(m.today.winRate || 0).toFixed(1) + '%';
+    if (todayFees && m.today) todayFees.innerText = '₹' + Number(m.today.fees || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    if (todayVolume && m.today) todayVolume.innerText = '₹' + Number(m.today.volume || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
     if (lifetimeNetPnL && m.lifetime) {
-      lifetimeNetPnL.innerText = '₹' + Number(m.lifetime.netPnL).toLocaleString('en-IN', { minimumFractionDigits: 2 });
-      lifetimeNetPnL.style.color = m.lifetime.netPnL >= 0 ? '#10b981' : '#ef4444';
+      lifetimeNetPnL.innerText = '₹' + Number(m.lifetime.netPnL || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      lifetimeNetPnL.style.color = (m.lifetime.netPnL || 0) >= 0 ? '#10b981' : '#ef4444';
     }
-    if (lifetimeTotalTrades && m.lifetime) lifetimeTotalTrades.innerText = m.lifetime.trades;
-    if (lifetimeWinRate && m.lifetime) lifetimeWinRate.innerText = Number(m.lifetime.winRate).toFixed(1) + '%';
+    if (lifetimeTotalTrades && m.lifetime) lifetimeTotalTrades.innerText = m.lifetime.trades || 0;
+    if (lifetimeWinRate && m.lifetime) lifetimeWinRate.innerText = Number(m.lifetime.winRate || 0).toFixed(1) + '%';
   }
 
   // Update Funnel Visualizer (Phase 3)
@@ -1324,8 +1326,9 @@ async function loadChartForSymbol(symbol, entryTimestamp = null, indicatorsSnaps
 
   try {
     const res = await fetch(endpoint);
+    if (!res.ok) throw new Error('Failed to fetch candles');
     const result = await res.json();
-    if (!result.candles || result.candles.length === 0) return;
+    if (!result || !result.candles || result.candles.length === 0) return;
 
     allReplayCandles = result.candles;
     
@@ -1637,33 +1640,43 @@ function stepReplay() {
 async function fetchTradesHistory() {
   try {
     const res = await fetch(`${backendBase}/api/trades`);
-    const trades = await res.json();
-    window.tradesHistoryCache = trades;
-    
-    // Satisfy structural references if element exists
     const tradesTableBody = document.getElementById('trades-table-body');
-    if (tradesTableBody) {
-      if (trades.length === 0) {
-        tradesTableBody.innerHTML = `<tr><td colspan="7" class="empty-table">No trades logged.</td></tr>`;
-        return;
+    if (res.ok) {
+      const trades = await res.json();
+      window.tradesHistoryCache = trades;
+      
+      // Satisfy structural references if element exists
+      if (tradesTableBody) {
+        if (!trades || trades.length === 0) {
+          tradesTableBody.innerHTML = `<tr><td colspan="7" class="empty-table text-center">No trades logged.</td></tr>`;
+          return;
+        }
+        tradesTableBody.innerHTML = trades.map(t => {
+          const timeStr = t.timestamp ? new Date(t.timestamp).toLocaleTimeString() : 'N/A';
+          return `
+            <tr onclick="explainHoldingTrade('${t.symbol || ''}')" style="cursor:pointer">
+              <td>${timeStr}</td>
+              <td><b>${t.symbol || 'N/A'}</b></td>
+              <td style="color: ${t.action === 'BUY' ? '#10b981' : '#ef4444'}; font-weight: bold;">${t.action || 'N/A'}</td>
+              <td>${t.quantity || 0}</td>
+              <td>₹${Number(t.price || 0).toFixed(2)}</td>
+              <td>₹${Number(t.total_value || 0).toFixed(2)}</td>
+              <td><span style="font-style: italic; color: #9ca3af;">${t.reason || ''}</span></td>
+            </tr>
+          `;
+        }).join('');
       }
-      tradesTableBody.innerHTML = trades.map(t => {
-        const timeStr = new Date(t.timestamp).toLocaleTimeString();
-        return `
-          <tr onclick="explainHoldingTrade('${t.symbol}')" style="cursor:pointer">
-            <td>${timeStr}</td>
-            <td><b>${t.symbol}</b></td>
-            <td style="color: ${t.action === 'BUY' ? '#10b981' : '#ef4444'}; font-weight: bold;">${t.action}</td>
-            <td>${t.quantity}</td>
-            <td>₹${Number(t.price).toFixed(2)}</td>
-            <td>₹${Number(t.total_value).toFixed(2)}</td>
-            <td><span style="font-style: italic; color: #9ca3af;">${t.reason}</span></td>
-          </tr>
-        `;
-      }).join('');
+    } else {
+      if (tradesTableBody) {
+        tradesTableBody.innerHTML = `<tr><td colspan="7" class="empty-table text-center text-red">Backend Offline / Loading...</td></tr>`;
+      }
     }
   } catch (err) {
     console.error('Error fetching trade history:', err);
+    const tradesTableBody = document.getElementById('trades-table-body');
+    if (tradesTableBody) {
+      tradesTableBody.innerHTML = `<tr><td colspan="7" class="empty-table text-center text-red">Backend Offline / Loading...</td></tr>`;
+    }
   }
 }
 
@@ -1756,72 +1769,118 @@ setInterval(updateInstitutionalTelemetry, 5000);
 async function updateInstitutionalTelemetry() {
   try {
     // 1. Fetch Completed Trades & Journal
-    const tradesRes = await fetch(`${backendBase}/api/completed-trades`);
-    if (tradesRes.ok) {
-      const completed = await tradesRes.json();
+    try {
+      const tradesRes = await fetch(`${backendBase}/api/completed-trades`);
       const tbody = document.getElementById('inst-trade-journal-body');
-      if (tbody) {
-        if (completed.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="8" class="empty-table text-center">No completed trades recorded in journal.</td></tr>`;
-        } else {
-          tbody.innerHTML = completed.map(t => `
-            <tr>
-              <td>${t.exit_time ? new Date(t.exit_time).toLocaleTimeString() : 'N/A'}</td>
-              <td class="font-bold">${t.symbol}</td>
-              <td class="text-green font-bold">BUY</td>
-              <td>${t.quantity}</td>
-              <td>₹${Number(t.entry_price).toFixed(2)}</td>
-              <td>₹${Number(t.exit_price).toFixed(2)}</td>
-              <td class="${t.net_pnl >= 0 ? 'text-green' : 'text-red'} font-bold">₹${Number(t.net_pnl).toFixed(2)}</td>
-              <td>${t.exit_reason || 'N/A'}</td>
-            </tr>
-          `).join('');
+      if (tradesRes.ok) {
+        const completed = await tradesRes.json();
+        if (tbody) {
+          if (!completed || completed.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="empty-table text-center">No completed trades recorded in journal.</td></tr>`;
+          } else {
+            tbody.innerHTML = completed.map(t => `
+              <tr>
+                <td>${t.exit_time ? new Date(t.exit_time).toLocaleTimeString() : 'N/A'}</td>
+                <td class="font-bold">${t.symbol || 'N/A'}</td>
+                <td class="text-green font-bold">BUY</td>
+                <td>${t.quantity || 0}</td>
+                <td>₹${Number(t.entry_price || 0).toFixed(2)}</td>
+                <td>₹${Number(t.exit_price || 0).toFixed(2)}</td>
+                <td class="${(t.net_pnl || 0) >= 0 ? 'text-green' : 'text-red'} font-bold">₹${Number(t.net_pnl || 0).toFixed(2)}</td>
+                <td>${t.exit_reason || 'N/A'}</td>
+              </tr>
+            `).join('');
+          }
         }
+      } else {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="empty-table text-center text-red">Backend Offline / Loading...</td></tr>`;
       }
+    } catch (err) {
+      const tbody = document.getElementById('inst-trade-journal-body');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="empty-table text-center text-red">Backend Offline / Loading...</td></tr>`;
     }
     
     // 2. Fetch Equity Curve Data
-    const equityRes = await fetch(`${backendBase}/api/equity-curve`);
-    if (equityRes.ok) {
-      const curve = await equityRes.json();
-      drawEquityCurveCanvas(curve);
+    try {
+      const equityRes = await fetch(`${backendBase}/api/equity-curve`);
+      if (equityRes.ok) {
+        const curve = await equityRes.json();
+        if (curve && Array.isArray(curve)) drawEquityCurveCanvas(curve);
+      }
+    } catch (err) {
+      console.warn("Equity curve fetch failed", err);
     }
     
     // 3. Fetch Portfolio Allocation
-    const allocRes = await fetch(`${backendBase}/api/portfolio-allocation`);
-    if (allocRes.ok) {
-      const alloc = await allocRes.json();
-      const cashEl = document.getElementById('inst-alloc-cash');
-      if (cashEl) cashEl.innerText = '₹' + Number(alloc.cash).toLocaleString('en-IN', { minimumFractionDigits: 2 });
-      
+    try {
+      const allocRes = await fetch(`${backendBase}/api/portfolio-allocation`);
       const breakdownEl = document.getElementById('allocation-breakdown');
-      if (breakdownEl) {
-        let html = `<div>Cash: <b>₹${Number(alloc.cash).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b></div>`;
-        (alloc.holdings || []).forEach(h => {
-          html += `<div>${h.symbol}: <b>₹${Number(h.value).toFixed(2)} (${h.percentage.toFixed(1)}%)</b></div>`;
-        });
-        breakdownEl.innerHTML = html;
+      const cashEl = document.getElementById('inst-alloc-cash');
+      if (allocRes.ok) {
+        const alloc = await allocRes.json();
+        if (alloc) {
+          if (cashEl) cashEl.innerText = '₹' + Number(alloc.cash || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+          
+          if (breakdownEl) {
+            if (!alloc.holdings || alloc.holdings.length === 0) {
+              breakdownEl.innerHTML = `<div>Cash: <b>₹${Number(alloc.cash || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b></div><div class="text-xs text-gray-400 mt-2">No Active Positions</div>`;
+            } else {
+              let html = `<div>Cash: <b>₹${Number(alloc.cash || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b></div>`;
+              alloc.holdings.forEach(h => {
+                html += `<div>${h.symbol || 'UNK'}: <b>₹${Number(h.value || 0).toFixed(2)} (${(h.percentage || 0).toFixed(1)}%)</b></div>`;
+              });
+              breakdownEl.innerHTML = html;
+            }
+          }
+        }
+      } else {
+        if (breakdownEl) breakdownEl.innerHTML = `<div class="text-xs text-red mt-2">Backend Offline / Loading...</div>`;
+        if (cashEl) cashEl.innerText = 'Offline';
       }
+    } catch (err) {
+      const breakdownEl = document.getElementById('allocation-breakdown');
+      const cashEl = document.getElementById('inst-alloc-cash');
+      if (breakdownEl) breakdownEl.innerHTML = `<div class="text-xs text-red mt-2">Backend Offline / Loading...</div>`;
+      if (cashEl) cashEl.innerText = 'Offline';
     }
     
     // 4. Fetch Market Breadth
-    const breadthRes = await fetch(`${backendBase}/api/market-breadth`);
-    if (breadthRes.ok) {
-      const breadth = await breadthRes.json();
+    try {
+      const breadthRes = await fetch(`${backendBase}/api/market-breadth`);
       const breadthEl = document.getElementById('inst-market-breadth');
-      if (breadthEl) {
-        breadthEl.innerText = `${breadth.bullish}B / ${breadth.bearish}S`;
+      if (breadthRes.ok) {
+        const breadth = await breadthRes.json();
+        if (breadthEl && breadth) {
+          breadthEl.innerText = `${breadth.bullish || 0}B / ${breadth.bearish || 0}S`;
+        }
+      } else {
+        if (breadthEl) breadthEl.innerText = 'Offline';
       }
+    } catch (err) {
+      const breadthEl = document.getElementById('inst-market-breadth');
+      if (breadthEl) breadthEl.innerText = 'Offline';
     }
     
     // 5. Fetch Analytics
-    const analyticsRes = await fetch(`${backendBase}/api/analytics`);
-    if (analyticsRes.ok) {
-      const analytics = await analyticsRes.json();
+    try {
+      const analyticsRes = await fetch(`${backendBase}/api/analytics`);
       const pfEl = document.getElementById('inst-profit-factor');
       const sharpeEl = document.getElementById('inst-sharpe-ratio');
-      if (pfEl) pfEl.innerText = analytics.profitFactor.toFixed(2);
-      if (sharpeEl) sharpeEl.innerText = analytics.sharpeRatio.toFixed(2);
+      if (analyticsRes.ok) {
+        const analytics = await analyticsRes.json();
+        if (analytics) {
+          if (pfEl) pfEl.innerText = analytics.profitFactor != null ? analytics.profitFactor.toFixed(2) : 'N/A';
+          if (sharpeEl) sharpeEl.innerText = analytics.sharpeRatio != null ? analytics.sharpeRatio.toFixed(2) : 'N/A';
+        }
+      } else {
+        if (pfEl) pfEl.innerText = 'Offline';
+        if (sharpeEl) sharpeEl.innerText = 'Offline';
+      }
+    } catch (err) {
+      const pfEl = document.getElementById('inst-profit-factor');
+      const sharpeEl = document.getElementById('inst-sharpe-ratio');
+      if (pfEl) pfEl.innerText = 'Offline';
+      if (sharpeEl) sharpeEl.innerText = 'Offline';
     }
     
     // 6. Draw Heatmap

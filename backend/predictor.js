@@ -1,4 +1,5 @@
 const db = require('./db');
+const { withResilience } = require('./resilience');
 const config = require('../shared/config');
 const broker = require('./broker');
 const marketModel = require('./marketModel');
@@ -80,14 +81,14 @@ async function callGemini(symbol, ltp, pred1, pred4, pred5) {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-    const response = await fetch(url, {
+    const response = await withResilience('gemini', async () => await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }]
       }),
       signal: controller.signal
-    });
+    }), 3, 1000);
     clearTimeout(timeoutId);
 
     if (response.ok) {
@@ -174,7 +175,7 @@ async function callGroq(symbol, ltp, pred1, pred4, pred5) {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-    const response = await fetch(url, {
+    const response = await withResilience('groq', async () => await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -187,7 +188,7 @@ async function callGroq(symbol, ltp, pred1, pred4, pred5) {
         temperature: 0.1
       }),
       signal: controller.signal
-    });
+    }), 3, 1000);
     clearTimeout(timeoutId);
 
     if (response.ok) {
