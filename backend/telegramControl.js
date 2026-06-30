@@ -4,6 +4,8 @@ const db = require('./db');
 const tradingBot = require('./tradingBot');
 const broker = require('./broker');
 const predictor = require('./predictor');
+const exitIntelligenceEngine = require('./exitIntelligenceEngine');
+const marketData = require('./marketData');
 
 let bot = null;
 let isInitialized = false;
@@ -195,6 +197,10 @@ Status: UNAUTHORIZED
                  `/logs - Fetch the last 10 system log/alert entries\n` +
                  `/today - View today's completed trades list and total realized PnL\n` +
                  `/report - Generate institutional daily EOD report summary\n` +
+                 `/exitanalysis - Inspect detailed exit intelligence parameters\n` +
+                 `/holdreason - Display explanation for active position hold\n` +
+                 `/exitconfidence - View exit score confidence percentage\n` +
+                 `/tradehealth - Assess drawdown, time decay, and position risk health\n` +
                  `/agents - Inspect active AI agent weights and historical performance\n` +
                  `/risk - Display risk limits and portfolio protection rules\n` +
                  `/mode - Switch strategy modes (safe / high opportunity)\n` +
@@ -381,6 +387,132 @@ Status: UNAUTHORIZED
                    alertsList.map(a => `• [${new Date(a.timestamp).toLocaleTimeString()}] [${a.type}] ${a.message}`).join('\n');
       }
     }
+    // /exitanalysis command
+    else if (lowerText.startsWith('/exitanalysis')) {
+      const status = await tradingBot.getStatus();
+      const holdings = status.holdingStocks || [];
+      if (holdings.length === 0) {
+        response = `💼 <b>No open holdings to analyze.</b>`;
+      } else {
+        let msg = `🔍 <b>Institutional Exit Analysis</b>\n\n`;
+        for (const h of holdings) {
+          const candles = await marketData.getHistory(h.symbol, [], '5m', '2d');
+          let formattedCandles = [];
+          if (candles && candles.closes) {
+            formattedCandles = candles.closes.map((c, i) => ({
+              close: c,
+              open: candles.opens[i],
+              high: candles.highs[i],
+              low: candles.lows[i],
+              volume: candles.volumes ? candles.volumes[i] : 1000
+            }));
+          }
+          h.currentPrice = broker.getLTP(h.symbol) || h.avgPrice;
+          const evalResult = exitIntelligenceEngine.evaluatePositionExits(h, formattedCandles);
+          msg += `<b>Symbol: ${h.symbol}</b>\n` +
+                 `• Exit Confidence: <b>${evalResult.exitConfidence}/100</b>\n` +
+                 `• Recommendation: <b>${evalResult.recommendedMode}</b>\n` +
+                 `• Reason: <i>${evalResult.reason}</i>\n` +
+                 `• Scores: MS: ${evalResult.components.marketStructure || 0} | SMC: ${evalResult.components.smc || 0} | Wyckoff: ${evalResult.components.wyckoff || 0} | Vol: ${evalResult.components.volume || 0} | Mom: ${evalResult.components.momentum || 0} | Trend: ${evalResult.components.trend || 0} | Volatility: ${evalResult.components.volatility || 0} | Candle: ${evalResult.components.candlestick || 0} | MTF: ${evalResult.components.mtf || 0} | Risk: ${evalResult.components.risk || 0}\n\n`;
+        }
+        response = msg;
+      }
+    }
+    // /holdreason command
+    else if (lowerText.startsWith('/holdreason')) {
+      const status = await tradingBot.getStatus();
+      const holdings = status.holdingStocks || [];
+      if (holdings.length === 0) {
+        response = `💼 <b>No open holdings.</b>`;
+      } else {
+        let msg = `🛡️ <b>Hold Reasons</b>\n\n`;
+        for (const h of holdings) {
+          const candles = await marketData.getHistory(h.symbol, [], '5m', '2d');
+          let formattedCandles = [];
+          if (candles && candles.closes) {
+            formattedCandles = candles.closes.map((c, i) => ({
+              close: c,
+              open: candles.opens[i],
+              high: candles.highs[i],
+              low: candles.lows[i],
+              volume: candles.volumes ? candles.volumes[i] : 1000
+            }));
+          }
+          h.currentPrice = broker.getLTP(h.symbol) || h.avgPrice;
+          const evalResult = exitIntelligenceEngine.evaluatePositionExits(h, formattedCandles);
+          msg += `<b>Symbol: ${h.symbol}</b>\n` +
+                 `• Action: <b>${evalResult.shouldExit ? 'EXIT (' + evalResult.recommendedMode + ')' : 'HOLD'}</b>\n` +
+                 `• Explanation: ${evalResult.reason}\n\n`;
+        }
+        response = msg;
+      }
+    }
+    // /exitconfidence command
+    else if (lowerText.startsWith('/exitconfidence')) {
+      const status = await tradingBot.getStatus();
+      const holdings = status.holdingStocks || [];
+      if (holdings.length === 0) {
+        response = `💼 <b>No open holdings.</b>`;
+      } else {
+        let msg = `📈 <b>Exit Confidence Scores</b>\n\n`;
+        for (const h of holdings) {
+          const candles = await marketData.getHistory(h.symbol, [], '5m', '2d');
+          let formattedCandles = [];
+          if (candles && candles.closes) {
+            formattedCandles = candles.closes.map((c, i) => ({
+              close: c,
+              open: candles.opens[i],
+              high: candles.highs[i],
+              low: candles.lows[i],
+              volume: candles.volumes ? candles.volumes[i] : 1000
+            }));
+          }
+          h.currentPrice = broker.getLTP(h.symbol) || h.avgPrice;
+          const evalResult = exitIntelligenceEngine.evaluatePositionExits(h, formattedCandles);
+          msg += `• <b>${h.symbol}</b>: Exit Confidence <b>${evalResult.exitConfidence}%</b> [Threshold: ${h.exitThresholdOverride || 70}%]\n`;
+        }
+        response = msg;
+      }
+    }
+    // /tradehealth command
+    else if (lowerText.startsWith('/tradehealth')) {
+      const status = await tradingBot.getStatus();
+      const holdings = status.holdingStocks || [];
+      if (holdings.length === 0) {
+        response = `💼 <b>No open holdings.</b>`;
+      } else {
+        let msg = `❤️ <b>Trade Health Status</b>\n\n`;
+        for (const h of holdings) {
+          const candles = await marketData.getHistory(h.symbol, [], '5m', '2d');
+          let formattedCandles = [];
+          if (candles && candles.closes) {
+            formattedCandles = candles.closes.map((c, i) => ({
+              close: c,
+              open: candles.opens[i],
+              high: candles.highs[i],
+              low: candles.lows[i],
+              volume: candles.volumes ? candles.volumes[i] : 1000
+            }));
+          }
+          h.currentPrice = broker.getLTP(h.symbol) || h.avgPrice;
+          const evalResult = exitIntelligenceEngine.evaluatePositionExits(h, formattedCandles);
+          
+          const returnPct = ((h.currentPrice - h.avgPrice) / h.avgPrice) * 100;
+          const peakPrice = h.maxPrice || h.currentPrice;
+          const givebackPct = ((peakPrice - h.currentPrice) / peakPrice) * 100;
+          
+          const healthStatus = evalResult.components.risk >= 75 ? 'DANGER 🔴' : (evalResult.components.risk >= 55 ? 'WARNING 🟡' : 'HEALTHY 🟢');
+          
+          msg += `<b>Symbol: ${h.symbol}</b> [${healthStatus}]\n` +
+                 `   • Return: <b>${returnPct.toFixed(2)}%</b>\n` +
+                 `   • Peak Price: ₹${peakPrice.toFixed(2)}\n` +
+                 `   • Pullback: <b>${givebackPct.toFixed(2)}%</b>\n` +
+                 `   • Risk Score: <b>${evalResult.components.risk || 0}/100</b>\n` +
+                 `   • Mode: <b>${evalResult.recommendedMode}</b>\n\n`;
+        }
+        response = msg;
+      }
+    }
     // /restart command
     else if (lowerText.startsWith('/restart')) {
       await tradingBot.stop();
@@ -434,7 +566,7 @@ Status: UNAUTHORIZED
                    `• Avoid Long-Term: <b>${settings.avoid_longterm ? 'YES' : 'NO'}</b>`;
       } else {
         response = `🤖 Unknown command. Available commands:\n` +
-                   `/start, /stop, /pause, /resume, /status, /portfolio, /pnl, /target, /intelligence, /report, /agents, /weights, /memory, /scanner, /audit, /positions, /risk, /health, /performance, /logs, /restart, /today\n` +
+                   `/start, /stop, /pause, /resume, /status, /portfolio, /pnl, /target, /intelligence, /report, /exitanalysis, /holdreason, /exitconfidence, /tradehealth, /agents, /weights, /memory, /scanner, /audit, /positions, /risk, /health, /performance, /logs, /restart, /today\n` +
                    `Or write intents like: <i>"Focus on safer trades"</i> or <i>"Avoid long-term positions"</i>.`;
       }
     }

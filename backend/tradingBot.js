@@ -10,6 +10,7 @@ const agentResearch = require('./agentResearch');
 const marketData = require('./marketData');
 const providerHealth = require('./providerHealth');
 const volumeIntelligenceAgent = require('./volumeIntelligenceAgent');
+const exitIntelligenceEngine = require('./exitIntelligenceEngine');
 
 const pendingExecutions = new Set();
 let entriesPaused = false;
@@ -158,7 +159,8 @@ let preMarketState = {
   failsafeRetries: 0,
   openingScanFailureAlerted: false,
   noSignalsWarningAlerted: false,
-  watchlistLoadedAlerted: false
+  watchlistLoadedAlerted: false,
+  currentDate: null
 };
 
 let signalSuppressionState = {
@@ -328,7 +330,8 @@ const tradingBot = {
       failsafeRetries: 0,
       openingScanFailureAlerted: false,
       noSignalsWarningAlerted: false,
-      watchlistLoadedAlerted: false
+      watchlistLoadedAlerted: false,
+      currentDate: null
     };
     signalSuppressionState = {
       totalCandidates: 0,
@@ -1114,91 +1117,32 @@ const tradingBot = {
       const activePositions = portfolio.holding_stocks || [];
       if (activePositions.length === 0) return;
 
-      const dtResult = dynamicThreshold.getCurrentThreshold();
-      const volatilityLevel = dtResult.components?.volatility?.level || 'CALM';
-      
-      let slPercent = 1.5;
-      let targetPercent = 3.0;
-      if (volatilityLevel === 'VOLATILE') {
-        slPercent = 2.5;
-        targetPercent = 5.0;
-      } else if (volatilityLevel === 'CALM') {
-        slPercent = 1.0;
-        targetPercent = 2.0;
-      }
-
       // Process exits
       for (const pos of activePositions) {
         const currentPrice = broker.getLTP(pos.symbol) || pos.avgPrice;
         const returnPct = ((currentPrice - pos.avgPrice) / pos.avgPrice) * 100;
 
-        // Track peak price for trailing stop
+        // Track peak price
         pos.maxPrice = Math.max(pos.maxPrice || pos.avgPrice, currentPrice);
+        pos.currentPrice = currentPrice;
 
-        let slHit = false;
-        let targetHit = false;
-
-        if (pos.stopLossPrice) {
-          slHit = currentPrice <= pos.stopLossPrice;
-        } else {
-          slHit = returnPct <= -slPercent;
+        // Get historical candles for evaluation
+        const history = await marketData.getHistory(pos.symbol, [], '5m', '2d');
+        let formattedCandles = [];
+        if (history && history.closes && history.closes.length > 0) {
+          formattedCandles = history.closes.map((c, idx) => ({
+            close: c,
+            open: history.opens[idx],
+            high: history.highs[idx],
+            low: history.lows[idx],
+            volume: history.volumes ? history.volumes[idx] : 1000
+          }));
         }
 
-        if (pos.targetPrice) {
-          targetHit = currentPrice >= pos.targetPrice;
-        } else {
-          targetHit = returnPct >= targetPercent;
-        }
+        const exitEval = exitIntelligenceEngine.evaluatePositionExits(pos, formattedCandles);
 
-        let exitReason = '';
-
-        // 1. Break-Even Protection (TIGHTENED: if return was >= 0.3% and drops back to 0.05%)
-        const peakReturn = ((pos.maxPrice - pos.avgPrice) / pos.avgPrice) * 100;
-        if (peakReturn >= 0.3 && returnPct <= 0.05) {
-          slHit = true;
-          exitReason = 'Break-Even Protection Hit';
-        }
-
-        // 2. Trailing Stop-Loss (TIGHTENED: activates at 0.8% peak, trails 0.4% from peak)
-        if (peakReturn >= 0.8) {
-          const trailingStopPrice = pos.maxPrice * 0.996; // 0.4% trailing drop
-          if (currentPrice <= trailingStopPrice) {
-            slHit = true;
-            exitReason = 'Trailing Stop-Loss Hit';
-          }
-        }
-
-        // 3. Profit-Lock Mechanism (TIGHTENED: Lock 1.5% if peak return reaches 2.0%)
-        if (peakReturn >= 2.0 && returnPct < 1.5) {
-          slHit = true;
-          exitReason = 'Profit-Lock Hit';
-        }
-
-        // 4. Strategy Exit: If live consensus signal reverses to SELL
-        if (!slHit && !targetHit) {
-          try {
-            const livePrediction = await predictor.getPrediction(pos.symbol, [currentPrice]);
-            if (livePrediction && livePrediction.signal === 'SELL') {
-              slHit = true;
-              exitReason = 'Strategy Exit (Consensus Reversed)';
-            }
-          } catch (e) {
-            console.warn(`[PORTFOLIO] Failed to run strategy exit check for ${pos.symbol}:`, e.message);
-          }
-        }
-
-        // 5. Time Exit: EOD Liquidation after 15:20 IST
-        const sysTime = getSystemTime();
-        const minsCheck = sysTime.hours * 60 + sysTime.minutes;
-        if (minsCheck >= 15 * 60 + 20) {
-          slHit = true;
-          exitReason = 'Time Exit (EOD Liquidation)';
-        }
-
-        if (slHit || targetHit) {
-          if (!exitReason) {
-            exitReason = slHit ? 'Stop Loss Hit' : 'Profit Target Hit';
-          }
+        if (exitEval.shouldExit) {
+          const exitReason = exitEval.reason;
           console.log(`[PORTFOLIO EXIT] Closing ${pos.symbol} due to ${exitReason}. Return: ${returnPct.toFixed(2)}%`);
 
           const tradePnL = pos.quantity * (currentPrice - pos.avgPrice);
@@ -1215,13 +1159,17 @@ const tradingBot = {
           );
 
           // Update losing streak count
-          if (slHit && exitReason === 'Stop Loss Hit') {
+          if (returnPct < 0) {
             consecutiveLossesCount++;
           } else {
             consecutiveLossesCount = 0;
           }
 
-          await db.matchBuyAndCreateCompletedTrade(pos.symbol, currentPrice, pos.quantity, new Date().toISOString(), exitReason);
+          const completedTrade = await db.matchBuyAndCreateCompletedTrade(pos.symbol, currentPrice, pos.quantity, new Date().toISOString(), exitReason);
+          if (completedTrade) {
+            // Adapt weights
+            exitIntelligenceEngine.adaptExitWeights(completedTrade);
+          }
           await predictor.recordPredictionExit(pos.symbol, currentPrice, tradePnL, pos);
 
           // Update Self-Learning Engine (Phase 19 statistics)
@@ -1269,14 +1217,15 @@ const tradingBot = {
           } catch (bfErr) {
             console.error('[PORTFOLIO] Failed to backfill memory outcomes:', bfErr.message);
           }
+          
           const exitBreakdown = getVoteBreakdown({ participating_models: pos.participating_models });
           const exitBuyCount = exitBreakdown.breakdown.BUY || 0;
           const exitSellCount = exitBreakdown.breakdown.SELL || 0;
           const exitHoldCount = exitBreakdown.breakdown.HOLD || 0;
           
           const entryPrice = pos.avgPrice;
-          const targetPrice = entryPrice * (1 + targetPercent / 100);
-          const stopLossPrice = entryPrice * (1 - slPercent / 100);
+          const targetPrice = entryPrice * 1.03;
+          const stopLossPrice = entryPrice * 0.985;
           const exitRisk = Math.abs(entryPrice - stopLossPrice);
           const exitReward = Math.abs(targetPrice - entryPrice);
           const exitRRRatio = exitRisk > 0 ? (exitReward / exitRisk).toFixed(2) : '1.50';
@@ -1323,48 +1272,27 @@ const tradingBot = {
         const currentPrice = broker.getLTP(shadow.symbol) || shadow.entry_price;
         const returnPct = ((currentPrice - shadow.entry_price) / shadow.entry_price) * 100;
 
+        // Track peak price
         shadow.maxPrice = Math.max(shadow.maxPrice || shadow.entry_price, currentPrice);
+        shadow.currentPrice = currentPrice;
+        shadow.avgPrice = shadow.entry_price;
 
-        const dtResult = dynamicThreshold.getCurrentThreshold();
-        const volatilityLevel = dtResult.components?.volatility?.level || 'CALM';
-
-        let slPercent = 1.5;
-        let targetPercent = 3.0;
-        if (volatilityLevel === 'VOLATILE') {
-          slPercent = 2.5;
-          targetPercent = 5.0;
-        } else if (volatilityLevel === 'CALM') {
-          slPercent = 1.0;
-          targetPercent = 2.0;
+        const history = await marketData.getHistory(shadow.symbol, [], '5m', '2d');
+        let formattedCandles = [];
+        if (history && history.closes && history.closes.length > 0) {
+          formattedCandles = history.closes.map((c, idx) => ({
+            close: c,
+            open: history.opens[idx],
+            high: history.highs[idx],
+            low: history.lows[idx],
+            volume: history.volumes ? history.volumes[idx] : 1000
+          }));
         }
 
-        let slHit = returnPct <= -slPercent; 
-        let targetHit = returnPct >= targetPercent; 
-        let exitReason = '';
+        const exitEval = exitIntelligenceEngine.evaluatePositionExits(shadow, formattedCandles);
 
-        const peakReturn = ((shadow.maxPrice - shadow.entry_price) / shadow.entry_price) * 100;
-        if (peakReturn >= 0.5 && returnPct <= 0.1) {
-          slHit = true;
-          exitReason = 'Break-Even Protection Hit';
-        }
-
-        if (peakReturn >= 1.0) {
-          const trailingStopPrice = shadow.maxPrice * 0.995;
-          if (currentPrice <= trailingStopPrice) {
-            slHit = true;
-            exitReason = 'Trailing Stop-Loss Hit';
-          }
-        }
-
-        if (peakReturn >= 2.5 && returnPct < 2.0) {
-          slHit = true;
-          exitReason = 'Profit-Lock Hit';
-        }
-
-        if (slHit || targetHit) {
-          if (!exitReason) {
-            exitReason = slHit ? 'Stop Loss Hit' : 'Profit Target Hit';
-          }
+        if (exitEval.shouldExit) {
+          const exitReason = exitEval.reason;
           console.log(`[SHADOW EXIT] Closing shadow position ${shadow.symbol} due to ${exitReason}. Return: ${returnPct.toFixed(2)}%`);
 
           shadow.status = 'CLOSED';
@@ -1394,6 +1322,42 @@ const tradingBot = {
       return;
     }
     const currentMins = timeInfo.hours * 60 + timeInfo.minutes;
+
+    // Daily reset check: if dateStr has changed since last processed tick, reset preMarketState
+    if (!preMarketState.currentDate || preMarketState.currentDate !== timeInfo.dateStr) {
+      console.log(`[SCHEDULER] New trading day detected: ${timeInfo.dateStr}. Resetting pre-market state and resuming entries.`);
+      const lastAuditLog = preMarketState.auditLog || [];
+      preMarketState = {
+        database: 'PENDING',
+        websocket: 'PENDING',
+        agents: 'PENDING',
+        broker: 'PENDING',
+        scheduler: 'PENDING',
+        market: 'PENDING',
+        system: 'PENDING',
+        readinessScore: 0,
+        auditLog: lastAuditLog,
+        timeline: [],
+        preMarketInitialized: false,
+        finalCheckPassed: false,
+        marketOpenTriggered: false,
+        firstScanCompleted: false,
+        firstSignalGenerated: false,
+        firstTradeExecuted: false,
+        lastScanTime: 0,
+        lastSignalTime: 0,
+        lastTradeTime: 0,
+        failsafeRetries: 0,
+        openingScanFailureAlerted: false,
+        noSignalsWarningAlerted: false,
+        watchlistLoadedAlerted: false,
+        currentDate: timeInfo.dateStr
+      };
+      entriesPaused = false;
+      global.profitChasingMode = false;
+      tqsThresholdOffset = 0;
+      sizingScaleFactor = 1.0;
+    }
     
     // Pre-Market Mode (09:00 - 09:15 IST)
     if (currentMins >= 9 * 60 && currentMins < 9 * 60 + 15) {
@@ -1574,16 +1538,20 @@ const tradingBot = {
     // Opportunity Scanner Trigger (GROWTH MODE: Every 30 seconds = 60 ticks. PROFIT CHASING Mode: Every 15 seconds = 30 ticks)
     const scanInterval = global.profitChasingMode ? 30 : 60;
     if (scanTimer % scanInterval === 0) {
-      console.log(`[SCHEDULER TRACE] scanUniverse() started at ${new Date().toISOString()} | scanTimer: ${scanTimer}`);
-      const scanResults = await marketScanner.scanUniverse();
-      await this.processScannerRankings(scanResults, valuation);
-      await this.updateFutureReturns();
+      if (this.isMarketOpenWindow(timeInfo)) {
+        console.log(`[SCHEDULER TRACE] scanUniverse() started at ${new Date().toISOString()} | scanTimer: ${scanTimer}`);
+        const scanResults = await marketScanner.scanUniverse();
+        await this.processScannerRankings(scanResults, valuation);
+        await this.updateFutureReturns();
+      } else {
+        console.log(`[SCHEDULER TRACE] Skipping scan: Outside market window.`);
+      }
     }
     
     scanTimer++;
 
     // Update Agent 24 Opportunity Cost audits every 60 ticks (30s)
-    if (scanTimer % 60 === 0) {
+    if (scanTimer % 60 === 0 && this.isMarketOpenWindow(timeInfo)) {
       try {
         const agentResearch = require('./agentResearch');
         await agentResearch.updateOpportunityAudits();
@@ -1804,12 +1772,12 @@ const tradingBot = {
     for (const cand of best5Trades) {
       const { item, prediction, tqs } = cand;
 
-      // 15:15 IST Entry restriction check
+      // 15:30 IST Entry restriction check
       const timeCheck = getSystemTime();
       const minsCheck = timeCheck.hours * 60 + timeCheck.minutes;
-      if (minsCheck >= 15 * 60 + 15) {
-        console.log(`[PORTFOLIO SKIP] 15:15 IST entry restriction. Skipping trade for ${item.symbol}.`);
-        await this.logOpportunityInTracker(item, prediction, tqs, 'REJECTED', '15:15 entry restriction');
+      if (minsCheck >= 15 * 60 + 30) {
+        console.log(`[PORTFOLIO SKIP] 15:30 IST entry restriction. Skipping trade for ${item.symbol}.`);
+        await this.logOpportunityInTracker(item, prediction, tqs, 'REJECTED', '15:30 entry restriction');
         continue;
       }
 

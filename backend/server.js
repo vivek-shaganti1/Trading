@@ -117,7 +117,10 @@ app.get('/api/status', async (req, res) => {
 app.get('/api/health', async (req, res) => {
   try {
     const status = await tradingBot.getStatus();
-    const dbStatus = db.initPromise ? 'CONNECTED' : 'DISCONNECTED';
+    const dbStatus = db.isNeonOnline() ? 'CONNECTED' : 'DISCONNECTED';
+    const tgHealth = telegramControl.getTelegramHealth();
+    const tgStatus = tgHealth.status === 'CONNECTED' ? (tgHealth.webhook ? 'WEBHOOK' : 'POLLING') : 'OFFLINE';
+    
     res.json({
       status: 'healthy',
       version: '1.0.0',
@@ -127,7 +130,7 @@ app.get('/api/health', async (req, res) => {
         trading_engine: status.isRunning ? 'ACTIVE' : 'PAUSED',
         database: dbStatus,
         market_data: 'STABLE',
-        telegram: config.TELEGRAM_BOT_TOKEN ? 'POLLING' : 'OFFLINE',
+        telegram: tgStatus,
         websocket: 'ONLINE',
         learning_engine: 'SYNCED',
         scheduler: 'ACTIVE'
@@ -155,12 +158,15 @@ app.get('/api/telegram/health', (req, res) => {
 // API: Start/Stop bot
 app.post('/api/control', async (req, res) => {
   const { action } = req.body;
+  console.log(`[API CONTROL] Action: ${action} received.`);
   if (action === 'START') {
+    tradingBot.resumeEntries();
     await tradingBot.start();
-    res.json({ success: true, message: 'Bot started successfully.' });
+    res.json({ success: true, message: 'Bot started successfully and entries resumed.' });
   } else if (action === 'STOP') {
     tradingBot.stop();
-    res.json({ success: true, message: 'Bot stopped successfully.' });
+    tradingBot.pauseEntries();
+    res.json({ success: true, message: 'Bot stopped successfully and entries paused.' });
   } else {
     res.status(400).json({ error: 'Invalid action' });
   }
@@ -742,6 +748,53 @@ async function sendUpdate(ws) {
     console.error('WebSocket update failed:', err);
   }
 }
+
+// Exit Intelligence Telemetry Endpoint
+app.get('/api/exit-intelligence', async (req, res) => {
+  try {
+    const portfolio = await db.getPortfolioState();
+    const activePositions = portfolio.holding_stocks || [];
+    const exitIntelligenceEngine = require('./exitIntelligenceEngine');
+    const marketData = require('./marketData');
+    const broker = require('./broker');
+    
+    const results = [];
+    for (const pos of activePositions) {
+      const candles = await marketData.getHistory(pos.symbol, [], '5m', '2d');
+      let formattedCandles = [];
+      if (candles && candles.closes && candles.closes.length > 0) {
+        formattedCandles = candles.closes.map((c, i) => ({
+          close: c,
+          open: candles.opens[i],
+          high: candles.highs[i],
+          low: candles.lows[i],
+          volume: candles.volumes ? candles.volumes[i] : 1000
+        }));
+      }
+      
+      pos.currentPrice = broker.getLTP(pos.symbol) || pos.avgPrice;
+      const evalResult = exitIntelligenceEngine.evaluatePositionExits(pos, formattedCandles);
+      results.push({
+        symbol: pos.symbol,
+        avgPrice: pos.avgPrice,
+        currentPrice: pos.currentPrice,
+        quantity: pos.quantity,
+        timestamp: pos.timestamp,
+        ...evalResult
+      });
+    }
+    
+    const localDb = db.readLocalDb();
+    
+    res.json({
+      activePositions: results,
+      currentWeights: exitIntelligenceEngine.getExitWeights(),
+      learningFeedback: localDb.exit_learning_feedback || []
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Telegram webhook route
 app.post('/api/telegram-webhook', (req, res) => {

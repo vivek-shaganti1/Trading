@@ -113,8 +113,13 @@ function getWsUrl() {
     return customUrl.replace(/^http/, 'ws').replace(/\/$/, '') + '/';
   }
   const injectedUrl = "__WS_BASE_URL__";
-  if (injectedUrl && !injectedUrl.startsWith('__')) {
+  if (injectedUrl && !injectedUrl.startsWith('__') && injectedUrl !== '') {
     return injectedUrl.replace(/\/$/, '') + '/';
+  }
+  const base = getBackendBase();
+  if (base) {
+    const wsProtocol = base.startsWith('https') ? 'wss:' : 'ws';
+    return base.replace(/^https?:\/\//, `${wsProtocol}//`) + '/';
   }
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${wsProtocol}//${window.location.host}/`;
