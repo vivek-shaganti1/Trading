@@ -134,10 +134,25 @@ let isBotRunning = false;
 let reconnectAttempts = 0;
 const maxReconnectDelay = 30000;
 let heartbeatInterval = null;
+let watchdogTimeout = null;
 
 // Global predictions cache to feed decision explainer
 window.predictionsCache = {};
 window.lastDashboardData = null;
+
+function resetWatchdog() {
+  if (watchdogTimeout) {
+    clearTimeout(watchdogTimeout);
+  }
+  watchdogTimeout = setTimeout(() => {
+    console.warn('[WS WATCHDOG]: No server updates received for 15 seconds. Terminating socket connection to trigger reconnect.');
+    if (ws) {
+      try {
+        ws.close();
+      } catch (e) {}
+    }
+  }, 15000);
+}
 
 function connectWS() {
   if (ws) {
@@ -156,10 +171,12 @@ function connectWS() {
     connStatusDot.className = 'status-dot connected';
     connStatusText.innerText = 'Connected';
     startHeartbeat();
+    resetWatchdog();
   };
 
   ws.onmessage = (event) => {
     window.lastUpdateTimestamp = Date.now();
+    resetWatchdog();
     try {
       const payload = JSON.parse(event.data);
       if (payload.type === 'PONG') {
@@ -178,6 +195,10 @@ function connectWS() {
     connStatusDot.className = 'status-dot disconnected';
     connStatusText.innerText = 'Disconnected';
     stopHeartbeat();
+    if (watchdogTimeout) {
+      clearTimeout(watchdogTimeout);
+      watchdogTimeout = null;
+    }
     
     const delay = Math.min(maxReconnectDelay, Math.pow(2, reconnectAttempts) * 1000);
     reconnectAttempts++;

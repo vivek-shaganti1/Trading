@@ -6,6 +6,7 @@ const broker = require('./broker');
 const predictor = require('./predictor');
 const exitIntelligenceEngine = require('./exitIntelligenceEngine');
 const marketData = require('./marketData');
+const runtimeState = require('./runtimeState');
 
 let bot = null;
 let isInitialized = false;
@@ -363,6 +364,19 @@ Status: UNAUTHORIZED
                  `• Scanner status: <b>${status.isRunning ? 'SCANNING 🟢' : 'PAUSED 🔴'}</b>\n` +
                  `• Memory RSS: <b>${(process.memoryUsage().rss / 1024 / 1024).toFixed(1)} MB</b>\n` +
                  `• Uptime: <b>${Math.floor(process.uptime() / 60)} minutes</b>`;
+    }
+    // /runtime command
+    else if (lowerText.startsWith('/runtime')) {
+      const snapshot = runtimeState.getSnapshot();
+      response = `⚡ <b>System Runtime Snapshot</b>\n` +
+                 `• Version: <b>${snapshot.system.version}</b>\n` +
+                 `• Engine State: <b>${snapshot.isRunning ? 'ACTIVE 🟢' : 'PAUSED ⏸'}</b>\n` +
+                 `• Entries Paused: <b>${snapshot.entriesPaused ? 'YES ⏸' : 'NO 🟢'}</b>\n` +
+                 `• Market State: <b>${snapshot.market.status} (${snapshot.market.isOpen ? 'OPEN' : 'CLOSED'})</b>\n` +
+                 `• Uptime: <b>${Math.floor(snapshot.system.uptime_seconds / 60)} minutes</b>\n` +
+                 `• Memory Usage: <b>${(snapshot.system.memory_usage.rss / 1024 / 1024).toFixed(1)} MB (RSS)</b>\n` +
+                 `• Open Positions Count: <b>${snapshot.positions.length}</b>\n` +
+                 `• Pending Orders Count: <b>${snapshot.pending_orders.length}</b>`;
     }
     // /performance command
     else if (lowerText.startsWith('/performance')) {

@@ -11,6 +11,7 @@ const marketData = require('./marketData');
 const providerHealth = require('./providerHealth');
 const volumeIntelligenceAgent = require('./volumeIntelligenceAgent');
 const exitIntelligenceEngine = require('./exitIntelligenceEngine');
+const runtimeState = require('./runtimeState');
 
 const pendingExecutions = new Set();
 let entriesPaused = false;
@@ -136,7 +137,7 @@ let tqsThresholdOffset = 0;
 let sizingScaleFactor = 1.0;
 let lastEodReportSentDate = null;
 
-let preMarketState = {
+const preMarketStateTarget = {
   database: 'PENDING',
   websocket: 'PENDING',
   agents: 'PENDING',
@@ -162,6 +163,22 @@ let preMarketState = {
   watchlistLoadedAlerted: false,
   currentDate: null
 };
+
+const preMarketState = new Proxy(preMarketStateTarget, {
+  get(target, prop) {
+    return target[prop];
+  },
+  set(target, prop, value) {
+    target[prop] = value;
+    const serviceFields = ['database', 'websocket', 'agents', 'broker', 'scheduler', 'market', 'system'];
+    if (serviceFields.includes(prop)) {
+      runtimeState.update(`services.${prop}`, value);
+    } else {
+      runtimeState.update(`market.${prop}`, value);
+    }
+    return true;
+  }
+});
 
 let signalSuppressionState = {
   totalCandidates: 0,
@@ -307,7 +324,7 @@ const tradingBot = {
     lastTargetAdaptTime = -1;
     tqsThresholdOffset = 0;
     sizingScaleFactor = 1.0;
-    preMarketState = {
+    Object.assign(preMarketState, {
       database: 'PENDING',
       websocket: 'PENDING',
       agents: 'PENDING',
@@ -332,8 +349,8 @@ const tradingBot = {
       noSignalsWarningAlerted: false,
       watchlistLoadedAlerted: false,
       currentDate: null
-    };
-    signalSuppressionState = {
+    });
+    Object.assign(signalSuppressionState, {
       totalCandidates: 0,
       rejectedByThreshold: 0,
       tqsBuckets: {
@@ -348,7 +365,7 @@ const tradingBot = {
       recommendedThreshold: 65,
       expectedAdditionalTrades: 0,
       winRateImpact: '+2.8% win rate stabilization'
-    };
+    });
   },
 
   addAuditLog(entry) {
@@ -894,6 +911,70 @@ const tradingBot = {
       preMarketState.readinessScore = Math.min(90, preMarketState.readinessScore);
     }
 
+    const scannerStats = marketScanner.getScannerStats ? marketScanner.getScannerStats() : {
+      currentScan: 0,
+      currentSession: 0,
+      today: 0,
+      lifetime: 0,
+      lastScanTime: 'None',
+      currentSymbol: 'Idle',
+      symbolsPerMin: 0,
+      avgScanTimeMs: 0
+    };
+
+    let tgStatus = 'OFFLINE';
+    try {
+      const telegramControl = require('./telegramControl');
+      const tgHealth = telegramControl.getTelegramHealth();
+      tgStatus = tgHealth.status === 'CONNECTED' ? (tgHealth.webhook ? 'WEBHOOK' : 'POLLING') : 'OFFLINE';
+    } catch (e) {}
+
+    // Update the centralized runtimeState single source of truth
+    runtimeState.updateBatch({
+      'isRunning': botInterval !== null,
+      'entriesPaused': entriesPaused,
+      'dailyLossLimitBreached': currentDayStats ? (currentDayStats.status === 'HALTED_DAILY_LOSS_LIMIT' || currentDayStats.status.startsWith('HALTED')) : false,
+      'services.database': preMarketState.database,
+      'services.websocket': preMarketState.websocket,
+      'services.agents': preMarketState.agents,
+      'services.broker': preMarketState.broker,
+      'services.scheduler': preMarketState.scheduler,
+      'services.market_data': modeString === 'MIXED' ? 'WARNING' : (modeString === 'LIVE' ? 'STABLE' : 'SIMULATED'),
+      'services.telegram': tgStatus,
+      'services.scanner': isTicking ? 'ACTIVE' : 'PAUSED',
+      'services.scheduler': 'ACTIVE',
+      'market.status': debugData.marketStatus || (isMarketOpenWindow() ? 'OPEN' : 'CLOSED'),
+      'market.isOpen': isMarketOpenWindow(),
+      'market.currentDate': preMarketState.currentDate,
+      'market.preMarketInitialized': preMarketState.preMarketInitialized,
+      'market.finalCheckPassed': preMarketState.finalCheckPassed,
+      'market.marketOpenTriggered': preMarketState.marketOpenTriggered,
+      'market.firstScanCompleted': preMarketState.firstScanCompleted,
+      'market.firstSignalGenerated': preMarketState.firstSignalGenerated,
+      'market.firstTradeExecuted': preMarketState.firstTradeExecuted,
+      'financials.capital': currentDayStats ? currentDayStats.start_capital : valuation.totalVal - netPnL,
+      'financials.cash': valuation.balance,
+      'financials.equity_value': valuation.equityValue,
+      'financials.realized_pnl': today.netPnL,
+      'financials.unrealized_pnl': parseFloat((valuation.totalVal - valuation.balance - valuation.equityValue).toFixed(2)),
+      'financials.daily_pnl': today.netPnL,
+      'financials.lifetime_pnl': lifetime.netPnL,
+      'financials.daily_target': currentDayStats ? currentDayStats.daily_target : Math.max(100.0, parseFloat((valuation.totalVal * 0.10).toFixed(2))),
+      'financials.capital_utilization': parseFloat(((valuation.totalVal - valuation.balance) / valuation.totalVal * 100).toFixed(2)),
+      'financials.risk_exposure': parseFloat((valuation.holdingStocks.reduce((sum, s) => sum + s.total_value, 0) / valuation.totalVal * 100).toFixed(2)),
+      'scanner.current_symbol': scannerStats.currentSymbol || 'Idle',
+      'scanner.session_scanned_count': scannerStats.currentSession || 0,
+      'scanner.today_scanned_count': scannerStats.today || 0,
+      'scanner.lifetime_scanned_count': scannerStats.lifetime || 0,
+      'scanner.scan_speed': scannerStats.symbolsPerMin || 0,
+      'scanner.last_scan_timestamp': scannerStats.lastScanTime || 'None',
+      'scanner.scanner_health': isTicking ? 'ACTIVE' : 'PAUSED',
+      'positions': valuation.holdingStocks || [],
+      'pending_orders': pendingExecutions ? Array.from(pendingExecutions) : [],
+      'timeline': preMarketState.timeline || [],
+      'auditLog': preMarketState.auditLog || []
+    });
+
     return {
       isRunning: botInterval !== null,
       marketDataMode: modeString,
@@ -932,16 +1013,7 @@ const tradingBot = {
         cycle,
         today,
         lifetime,
-        scannerStats: marketScanner.getScannerStats ? marketScanner.getScannerStats() : {
-          currentScan: 0,
-          currentSession: 0,
-          today: 0,
-          lifetime: 0,
-          lastScanTime: 'None',
-          currentSymbol: 'Idle',
-          symbolsPerMin: 0,
-          avgScanTimeMs: 0
-        }
+        scannerStats
       },
       providerHealth: providerHealth.getHealth()
     };
@@ -1327,7 +1399,7 @@ const tradingBot = {
     if (!preMarketState.currentDate || preMarketState.currentDate !== timeInfo.dateStr) {
       console.log(`[SCHEDULER] New trading day detected: ${timeInfo.dateStr}. Resetting pre-market state and resuming entries.`);
       const lastAuditLog = preMarketState.auditLog || [];
-      preMarketState = {
+      Object.assign(preMarketState, {
         database: 'PENDING',
         websocket: 'PENDING',
         agents: 'PENDING',
@@ -1352,7 +1424,7 @@ const tradingBot = {
         noSignalsWarningAlerted: false,
         watchlistLoadedAlerted: false,
         currentDate: timeInfo.dateStr
-      };
+      });
       entriesPaused = false;
       global.profitChasingMode = false;
       tqsThresholdOffset = 0;
