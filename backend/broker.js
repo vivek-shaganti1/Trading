@@ -43,9 +43,6 @@ let dataSourceName = 'Yahoo Finance API';
 let activeBroker = 'SIMULATOR';
 
 function isMarketOpenNow() {
-  if (process.env.FORCE_SIMULATION === 'true') {
-    return true;
-  }
   // Use Intl API for correct IST parsing
   const options = { timeZone: 'Asia/Kolkata', hour12: false, hour: 'numeric', minute: 'numeric', weekday: 'long' };
   const formatter = new Intl.DateTimeFormat('en-US', options);

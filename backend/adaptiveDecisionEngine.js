@@ -29,23 +29,7 @@ const SMC_WEIGHTS = {
  * AI Consensus only confirms, it never generates signals.
  */
 function evaluateDecision(symbol, direction, inputs) {
-  if (process.env.FORCE_SIMULATION === 'true') {
-    return {
-      execute: true,
-      score: 88,
-      threshold: 50,
-      rejections: [],
-      sizeScale: 1.0,
-      grade: 'A+',
-      probabilityMetrics: {
-        expectedWinProbability: 0.88,
-        expectedR: 2.0,
-        historicalPatternAccuracy: 0.88,
-        maxExpectedDrawdown: 4.0,
-        executionProbability: 0.88
-      }
-    };
-  }
+
   const rejections = [];
   let sizeScale = 1.0;
 

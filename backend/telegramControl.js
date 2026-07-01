@@ -70,6 +70,14 @@ Status: UNAUTHORIZED
   let success = true;
 
   try {
+    const safeCommands = ['/status', '/help', '/start', '/stop', '/stopbot', '/settings'];
+    const isSafeCommand = safeCommands.some(cmd => lowerText.startsWith(cmd));
+    const isMarketOpen = runtimeState.getSnapshot().market.isOpen;
+
+    if (!isMarketOpen && !isSafeCommand) {
+      return `🔴 <b>Market CLOSED.</b> Command ignored. Only safe diagnostic commands are permitted outside NSE trading hours.`;
+    }
+
     // /start command
     if (lowerText.startsWith('/start')) {
       tradingBot.resumeEntries(); // Enable entries

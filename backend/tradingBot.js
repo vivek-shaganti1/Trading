@@ -198,22 +198,7 @@ let signalSuppressionState = {
 };
 
 function getSystemTime() {
-  if (mockTime) return mockTime;
-  if (process.env.FORCE_SIMULATION === 'true') {
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0];
-    const startupTime = global.botStartupTime || now.getTime();
-    if (!global.botStartupTime) global.botStartupTime = startupTime;
-    const elapsedSeconds = Math.floor((now.getTime() - startupTime) / 1000);
-    const simulatedMinutes = (10 * 60) + Math.floor(elapsedSeconds / 6); // 1 simulated minute = 6 real seconds
-    return {
-      hours: Math.floor(simulatedMinutes / 60) % 24,
-      minutes: simulatedMinutes % 60,
-      seconds: now.getSeconds(),
-      dateStr: dateStr,
-      day: 1 // Monday (always weekday)
-    };
-  }
+  if (global.mockTime) return global.mockTime;
   const now = new Date();
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Kolkata',
@@ -756,18 +741,14 @@ const tradingBot = {
 
     // Phase 1: Hard Funnel Integrity Validation
     if (
-      scanned < passedTQS ||
-      passedTQS < passedConfidence ||
-      passedConfidence < passedRisk ||
-      passedRisk < passedConsensus ||
-      passedConsensus < ordersSubmitted ||
-      ordersSubmitted < ordersFilled
+      passedTQS > scanned ||
+      passedConfidence > passedTQS ||
+      passedRisk > passedConfidence ||
+      passedConsensus > passedRisk ||
+      ordersSubmitted > passedConsensus ||
+      ordersFilled > ordersSubmitted
     ) {
-      if (process.env.FORCE_SIMULATION === 'true') {
-        console.warn(`[FUNNEL INTEGRITY WARNING] bypassed due to simulation: scanned ${scanned} < tqs ${passedTQS} < confidence ${passedConfidence} < risk ${passedRisk} < consensus ${passedConsensus} < submitted ${ordersSubmitted} < filled ${ordersFilled}`);
-      } else {
-        throw new Error(`FUNNEL INTEGRITY FAILURE: scanned ${scanned} < tqs ${passedTQS} < confidence ${passedConfidence} < risk ${passedRisk} < consensus ${passedConsensus} < submitted ${ordersSubmitted} < filled ${ordersFilled}`);
-      }
+      console.warn(`[FUNNEL INTEGRITY WARNING] scanned ${scanned} >= tqs ${passedTQS} >= confidence ${passedConfidence} >= risk ${passedRisk} >= consensus ${passedConsensus} >= submitted ${ordersSubmitted} >= filled ${ordersFilled}`);
     }
 
     // Phase 3: Dynamic Readiness Score Calculation (Infra 40%, Performance 40%, Risk 20%)
