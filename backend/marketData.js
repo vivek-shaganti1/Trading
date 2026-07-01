@@ -1,5 +1,4 @@
 const config = require('../shared/config');
-const providerHealth = require('./providerHealth');
 const runtimeState = require('./runtimeState');
 
 const currentPrices = {};
@@ -105,45 +104,16 @@ const marketData = {
       return currentPrices[symbol];
     }
 
-    // Fallback: Generate price deterministically in SIMULATOR mode, or fetch from live Yahoo in LIVE mode
-    if (expectedMode === 'SIMULATOR') {
-      const priceSeed = (symbol.charCodeAt(0) * 10) % 1500 + 100;
-      this.updatePrice(symbol, priceSeed, 'SIMULATOR');
-      return priceSeed;
-    } else {
-      // In LIVE mode, if no cached price, throw error to prevent fallback to stale simulator pricing
-      throw new Error(`[MARKET DATA FAILURE] Price for ${symbol} not found in active live cache.`);
-    }
+    // In all modes (including SIMULATOR), we must use real live prices.
+    // If no cached price, throw error to prevent fallback to stale simulator pricing
+    throw new Error(`[MARKET DATA FAILURE] Price for ${symbol} not found in active live cache.`);
   },
 
-  // Fetch or generate historical charts for technical indicators
+  // Fetch historical charts for technical indicators
   async getHistory(symbol, closesHistory = [], interval = '5m', range = '5d') {
-    const expectedMode = this.getMode();
-
-    if (expectedMode === 'SIMULATOR') {
-      const seedShift = interval === '1h' ? 50 : (interval === '15m' ? 25 : 0);
-      const priceSeed = ((symbol.charCodeAt(0) * 10) % 1500 + 100) + seedShift;
-      const closes = [];
-      const highs = [];
-      const lows = [];
-      const volumes = [];
-      let currentPrice = priceSeed;
-      const bias = (Math.sin(seedShift) * 0.05) / 100;
-
-      for (let i = 0; i < 50; i++) {
-        closes.unshift(parseFloat(currentPrice.toFixed(2)));
-        highs.unshift(parseFloat((currentPrice * (1 + 0.003 * Math.random())).toFixed(2)));
-        lows.unshift(parseFloat((currentPrice * (1 - 0.003 * Math.random())).toFixed(2)));
-        volumes.unshift(Math.round(100000 + (i * 1000) % 50000 + Math.random() * 10000));
-        
-        const change = ((Math.random() * 0.3 - 0.15) / 100) + bias;
-        currentPrice = currentPrice / (1 + change);
-      }
-
-      return { closes, highs, lows, volumes, source: 'SIMULATOR' };
-    } else {
-      // 1. Response Caching Layer (1-minute TTL to block redundant queries within the same tick)
-      const cacheKey = `${symbol}_${interval}_${range}`;
+    // We always use LIVE market data, even if BROKER_MODE is SIMULATOR (paper trading)
+    // 1. Response Caching Layer (1-minute TTL to block redundant queries within the same tick)
+    const cacheKey = `${symbol}_${interval}_${range}`;
       const cached = responseCache[cacheKey];
       if (cached && (Date.now() - cached.timestamp < 60000)) {
         return cached.data;
@@ -176,7 +146,7 @@ const marketData = {
 
             const data = await res.json();
             const yahooLatencyMs = Date.now() - startTime;
-            providerHealth.recordCall('Yahoo', startTime, true, '200 OK');
+            runtimeState.updateProviderHealth('Yahoo', startTime, true, '200 OK');
             runtimeState.updateProviderHealth('yahoo', yahooLatencyMs, true);
 
             const quotes = data?.chart?.result?.[0]?.indicators?.quote?.[0] || {};
@@ -197,7 +167,7 @@ const marketData = {
           } catch (err) {
             lastErr = err;
             const yahooErrLatencyMs = Date.now() - startTime;
-            providerHealth.recordCall('Yahoo', startTime, false, err.message);
+            runtimeState.updateProviderHealth('Yahoo', startTime, false, err.message);
             runtimeState.updateProviderHealth('yahoo', yahooErrLatencyMs, false);
             // Exponential backoff delay
             await new Promise(r => setTimeout(r, backoffDelay));
@@ -219,7 +189,7 @@ const marketData = {
             });
             if (res.ok) {
               const data = await res.json();
-              providerHealth.recordCall('Kite', startTime, true, '200 OK');
+              runtimeState.updateProviderHealth('Kite', startTime, true, '200 OK');
               const ltp = data?.data?.[`NSE:${symbol}`]?.last_price;
               if (ltp) {
                 // Return structured object using LTP as history seed
@@ -240,7 +210,6 @@ const marketData = {
       };
 
       return await enqueueRequest(executionTask);
-    }
   },
 
   // Verify prices match within a 2.5% tolerance window

@@ -203,3 +203,174 @@ CREATE INDEX IF NOT EXISTS idx_risk_events_timestamp ON risk_events(timestamp DE
 CREATE INDEX IF NOT EXISTS idx_learning_feedback_timestamp ON learning_feedback(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_daily_model_performance_date ON daily_model_performance(date DESC);
 CREATE INDEX IF NOT EXISTS idx_completed_trades_timestamp ON completed_trades(exit_time DESC);
+
+-- 17. Agent 26 Market Memory
+CREATE TABLE IF NOT EXISTS agent26_market_memory (
+    id TEXT PRIMARY KEY,
+    timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+    regime TEXT NOT NULL,
+    volatility NUMERIC NOT NULL,
+    trend_bias TEXT NOT NULL,
+    details JSONB DEFAULT '{}'::jsonb
+);
+
+-- 18. Agent 21 Trust Logs
+CREATE TABLE IF NOT EXISTS agent21_trust_logs (
+    id TEXT PRIMARY KEY,
+    timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+    agent_id TEXT NOT NULL,
+    event TEXT NOT NULL,
+    trust_score NUMERIC NOT NULL,
+    details JSONB DEFAULT '{}'::jsonb
+);
+
+-- 19. Agent 22 Research Logs
+CREATE TABLE IF NOT EXISTS agent22_research_logs (
+    id TEXT PRIMARY KEY,
+    timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+    symbol TEXT NOT NULL,
+    findings TEXT NOT NULL,
+    sources JSONB DEFAULT '[]'::jsonb,
+    confidence NUMERIC NOT NULL
+);
+
+-- 20. Agent 23 Journals
+CREATE TABLE IF NOT EXISTS agent23_journals (
+    id TEXT PRIMARY KEY,
+    timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+    entry TEXT NOT NULL,
+    tags JSONB DEFAULT '[]'::jsonb
+);
+
+-- 21. Agent 20 Reports
+CREATE TABLE IF NOT EXISTS agent20_reports (
+    id TEXT PRIMARY KEY,
+    timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+    report_type TEXT NOT NULL,
+    content TEXT NOT NULL,
+    metrics JSONB DEFAULT '{}'::jsonb
+);
+
+-- 22. Agent 24 Audit Logs
+CREATE TABLE IF NOT EXISTS agent24_audit_logs (
+    id SERIAL PRIMARY KEY,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    symbol TEXT NOT NULL,
+    signal TEXT NOT NULL,
+    feature_vector JSONB NOT NULL,
+    outcome_pnl NUMERIC,
+    confidence NUMERIC,
+    vote_breakdown JSONB,
+    opportunity_score NUMERIC,
+    status TEXT
+);
+
+-- 23. EOD Report State
+CREATE TABLE IF NOT EXISTS eod_report_state (
+    id TEXT PRIMARY KEY,
+    date TEXT NOT NULL,
+    generated BOOLEAN DEFAULT false,
+    content TEXT
+);
+
+-- 24. Nightly Learning Reports
+CREATE TABLE IF NOT EXISTS nightly_learning_reports (
+    id SERIAL PRIMARY KEY,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    metrics JSONB NOT NULL,
+    missed_opportunities JSONB NOT NULL,
+    sizing_recommendations JSONB NOT NULL,
+    learning_log TEXT NOT NULL
+);
+
+-- 25. Threshold History
+CREATE TABLE IF NOT EXISTS threshold_history (
+    id SERIAL PRIMARY KEY,
+    timestamp TIMESTAMPTZ DEFAULT NOW(),
+    threshold NUMERIC,
+    regime TEXT,
+    volatility TEXT,
+    sector_strength TEXT,
+    reasoning TEXT
+);
+
+-- 26. Performance Metrics
+CREATE TABLE IF NOT EXISTS performance_metrics (
+    id SERIAL PRIMARY KEY,
+    date TEXT UNIQUE NOT NULL,
+    expected_profit NUMERIC,
+    profit_factor NUMERIC,
+    sharpe_ratio NUMERIC,
+    max_drawdown NUMERIC,
+    winning_symbols JSONB,
+    losing_symbols JSONB,
+    capital_utilization NUMERIC,
+    timestamp TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 27. Throughput History
+CREATE TABLE IF NOT EXISTS throughput_history (
+    id SERIAL PRIMARY KEY,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    scanned INTEGER NOT NULL,
+    researched INTEGER NOT NULL,
+    ranked INTEGER NOT NULL,
+    scored INTEGER NOT NULL,
+    candidates INTEGER NOT NULL,
+    consensus INTEGER NOT NULL,
+    executed INTEGER NOT NULL,
+    passed_risk INTEGER DEFAULT 0,
+    rejection_reasons JSONB NOT NULL
+);
+
+-- 28. Shadow Trades
+CREATE TABLE IF NOT EXISTS shadow_trades (
+    id TEXT PRIMARY KEY,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    symbol TEXT NOT NULL,
+    entry_price NUMERIC NOT NULL,
+    current_price NUMERIC,
+    quantity NUMERIC,
+    confidence NUMERIC,
+    tqs NUMERIC,
+    opportunity_score NUMERIC,
+    status TEXT DEFAULT 'OPEN',
+    pnl NUMERIC DEFAULT 0,
+    return_pct NUMERIC DEFAULT 0,
+    exit_price NUMERIC,
+    exit_timestamp TIMESTAMP WITH TIME ZONE
+);
+
+-- 29. Opportunity Tracker
+CREATE TABLE IF NOT EXISTS opportunity_tracker (
+    id SERIAL PRIMARY KEY,
+    symbol TEXT NOT NULL,
+    current_price NUMERIC,
+    confidence NUMERIC,
+    tqs NUMERIC,
+    consensus_score NUMERIC,
+    buy_votes INTEGER,
+    sell_votes INTEGER,
+    hold_votes INTEGER,
+    agent_count INTEGER,
+    signal_type TEXT,
+    rejection_reason TEXT,
+    scan_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    opportunity_score NUMERIC,
+    status TEXT DEFAULT 'WATCHLIST',
+    ref_15m NUMERIC,
+    ref_30m NUMERIC,
+    ref_1h NUMERIC,
+    ref_eod NUMERIC,
+    completed BOOLEAN DEFAULT FALSE,
+    participating_models JSONB,
+    debate_summary TEXT
+);
+
+-- ALTER Statements for modified tables
+ALTER TABLE trade_logs ADD COLUMN IF NOT EXISTS execution_mode TEXT;
+ALTER TABLE completed_trades ADD COLUMN IF NOT EXISTS entry_efficiency NUMERIC;
+ALTER TABLE completed_trades ADD COLUMN IF NOT EXISTS exit_efficiency NUMERIC;
+ALTER TABLE completed_trades ADD COLUMN IF NOT EXISTS mfe NUMERIC;
+ALTER TABLE completed_trades ADD COLUMN IF NOT EXISTS mae NUMERIC;
+

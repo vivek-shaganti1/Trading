@@ -46,21 +46,32 @@ function isMarketOpenNow() {
   if (process.env.FORCE_SIMULATION === 'true') {
     return true;
   }
-  const d = new Date();
-  const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
-  const ist = new Date(utc + (3600000 * 5.5));
+  // Use Intl API for correct IST parsing
+  const options = { timeZone: 'Asia/Kolkata', hour12: false, hour: 'numeric', minute: 'numeric', weekday: 'long' };
+  const formatter = new Intl.DateTimeFormat('en-US', options);
+  const parts = formatter.formatToParts(new Date());
   
-  const day = ist.getDay();
+  let hour = 0;
+  let minute = 0;
+  let dayName = '';
+  
+  for (const part of parts) {
+    if (part.type === 'hour') hour = parseInt(part.value, 10);
+    if (part.type === 'minute') minute = parseInt(part.value, 10);
+    if (part.type === 'weekday') dayName = part.value;
+  }
+  
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const day = days.indexOf(dayName);
+  
   if (day === 0 || day === 6) return false;
   
-  const hour = ist.getHours();
-  const minute = ist.getMinutes();
   const currentMins = hour * 60 + minute;
   
   const startMins = 9 * 60 + 15; // 9:15 AM
-  const closeMins = 15 * 60 + 30; // 3:30 PM
+  const endMins = 15 * 60 + 30;  // 3:30 PM
   
-  return currentMins >= startMins && currentMins < closeMins;
+  return currentMins >= startMins && currentMins < endMins;
 }
 
 // Native TOTP generator for Angel One SmartAPI login handshake
@@ -275,37 +286,31 @@ async function loginShoonya() {
   }
 }
 
-// Initialized update loop
-setInterval(async () => {
-  if (process.env.FORCE_SIMULATION === 'true') {
-    const symbols = Object.keys(YAHOO_MAPPINGS);
-    try {
-      const portfolio = await db.getPortfolioState();
-      if (portfolio && portfolio.holding_stocks) {
-        portfolio.holding_stocks.forEach(h => {
-          if (!symbols.includes(h.symbol)) symbols.push(h.symbol);
-        });
-      }
-    } catch (e) {}
+// Check if market is open
+function isMarketOpen() {
+  const now = new Date();
+  // 0 is Sunday, 6 is Saturday
+  if (now.getDay() === 0 || now.getDay() === 6) return false;
+  
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  const currentTotalMins = currentHour * 60 + currentMinute;
+  
+  const startMins = config.MARKET_START_TIME.hour * 60 + config.MARKET_START_TIME.minute;
+  const closeMins = config.MARKET_CLOSE_TIME.hour * 60 + config.MARKET_CLOSE_TIME.minute;
+  
+  return currentTotalMins >= startMins && currentTotalMins <= closeMins;
+}
 
-    const additionalSymbols = ['BLISSGVS', 'FLFL', 'FCONSUMER', 'EXIDEIND', 'AUROPHARMA', 'CHOLAHLDNG', 'DRREDDY', 'CHOLAFIN'];
-    additionalSymbols.forEach(s => {
-      if (!symbols.includes(s)) symbols.push(s);
-    });
-
-    symbols.forEach(symbol => {
-      let currentPrice = currentPrices[symbol] || ((symbol.charCodeAt(0) * 10) % 1000 + 100);
-      const changePercent = (Math.random() * 0.4 - 0.18) / 100;
-      currentPrice = parseFloat((currentPrice * (1 + changePercent)).toFixed(2));
-      currentPrices[symbol] = currentPrice;
-      try {
-        marketData.updatePrice(symbol, currentPrice, marketData.getMode());
-      } catch (err) {}
-    });
-    lastApiResponseTimestamp = new Date().toISOString();
+// Initialized update loop (recursive timeout to avoid overlaps)
+let pollingTimeout = null;
+async function pollRealPrices() {
+  if (isMarketOpenNow()) {
+    await fetchRealPrices(false);
   }
-  await fetchRealPrices(false);
-}, 2000);
+  pollingTimeout = setTimeout(pollRealPrices, 2000);
+}
+pollRealPrices();
 
 // Startup Auth Hook
 async function initBroker() {
@@ -423,6 +428,9 @@ const broker = {
       }
     }
     this._recentOrders.set(orderKey, now);
+    setTimeout(() => {
+      this._recentOrders.delete(orderKey);
+    }, 5000);
 
     let ltp = this.getLTP(symbol);
     if (ltp === 0) {
@@ -517,8 +525,12 @@ const broker = {
         }), 3, 500);
         const orderRes = await res.json();
         console.log(`[BROKER] Zerodha Kite Order placed status: ${orderRes.status}`);
+        if (orderRes.status !== 'success') {
+          throw new Error(`Zerodha API rejected order: ${orderRes.message || orderRes.status}`);
+        }
       } catch (err) {
         console.error('[BROKER] Zerodha Kite Connect placeOrder failed:', err.message);
+        throw err;
       }
     }
     // If active broker is ANGEL_ONE, place order on exchange
@@ -550,8 +562,12 @@ const broker = {
         }), 3, 500);
         const orderRes = await res.json();
         console.log(`[BROKER] Angel One Order placed: ${orderRes.message}`);
+        if (!orderRes.status) {
+          throw new Error(`Angel One API rejected order: ${orderRes.message}`);
+        }
       } catch (err) {
         console.error('[BROKER] Angel One placeOrder failed:', err.message);
+        throw err;
       }
     } 
     // If active broker is FINVASIA, place order on Shoonya
@@ -577,8 +593,12 @@ const broker = {
         }), 3, 500);
         const orderRes = await res.json();
         console.log(`[BROKER] Shoonya Order placed: ${orderRes.stat}`);
+        if (orderRes.stat !== 'Ok') {
+          throw new Error(`Shoonya API rejected order: ${orderRes.emsg || orderRes.stat}`);
+        }
       } catch (err) {
         console.error('[BROKER] Shoonya placeOrder failed:', err.message);
+        throw err;
       }
     }
 

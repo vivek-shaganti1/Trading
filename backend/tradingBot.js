@@ -8,10 +8,10 @@ const agent17_execution = require('./agent17_execution');
 const dynamicThreshold = require('./dynamicThreshold');
 const agentResearch = require('./agentResearch');
 const marketData = require('./marketData');
-const providerHealth = require('./providerHealth');
+const runtimeState = require('./runtimeState');
 const volumeIntelligenceAgent = require('./volumeIntelligenceAgent');
 const exitIntelligenceEngine = require('./exitIntelligenceEngine');
-const runtimeState = require('./runtimeState');
+
 
 const pendingExecutions = new Set();
 let entriesPaused = false;
@@ -403,7 +403,24 @@ const tradingBot = {
       const valuation = await broker.getValuation();
       
       const riskMode = portfolio.user_instructions?.risk_mode || 'NORMAL';
-      const calculatedTarget = Math.max(100.0, parseFloat((Math.max(12000, valuation.totalVal) * 0.10).toFixed(2)));
+      const riskPerTrade = (runtimeState && runtimeState.getSnapshot().settings.risk_per_trade_percent) || 1.0;
+      const cap = (typeof valuation !== 'undefined' ? valuation.totalVal : (typeof startCapital !== 'undefined' ? startCapital : 12000));
+      const avgRR = 2.5; 
+      const winRate = 0.62;
+      const dailyTrades = 7;
+      const expectedProfitPerTrade = (cap * (riskPerTrade / 100)) * ((avgRR * winRate) - (1 - winRate));
+      const calculatedTarget = Math.max(100.0, parseFloat((expectedProfitPerTrade * dailyTrades).toFixed(2)));
+      
+      if (runtimeState && runtimeState.targetEngineState) {
+        runtimeState.targetEngineState = {
+          ...runtimeState.targetEngineState,
+          dailyTarget: calculatedTarget,
+          requiredExpectedProfit: calculatedTarget,
+          requiredTradeCount: dailyTrades,
+          requiredWinRate: (winRate * 100).toFixed(0),
+          requiredCapitalUtilization: 85
+        };
+      }
 
       currentDayStats = {
         date: timeInfo.dateStr,
@@ -559,7 +576,10 @@ const tradingBot = {
   },
 
   async start() {
-    if (botInterval) clearInterval(botInterval);
+    if (botInterval) {
+      console.log('[BOT START]: Engine already running. Ignoring duplicate start request.');
+      return;
+    }
 
     // Warm up the preMarketState status flags on startup
     await this.runPreMarketWarmup();
@@ -576,13 +596,26 @@ const tradingBot = {
     }
 
     const portfolio = await db.getPortfolioState();
+    runtimeState.updateSettings(portfolio.user_instructions);
     console.log(`[BOT START]: Portfolio Loaded. Strategy: Expectancy Engine. Balance: ₹${portfolio.balance}`);
+
+    let lastPayloadStr = '';
 
     botInterval = setInterval(async () => {
       if (isTicking) return;
       isTicking = true;
       try {
         await this.tick();
+        // Broadcast state changes directly driven by the trading loop
+        if (typeof this.broadcastDashboardUpdate === 'function') {
+          // Check if payload actually changed before broadcasting
+          const currentPayload = await this.getStatus();
+          const currentPayloadStr = JSON.stringify(currentPayload);
+          if (currentPayloadStr !== lastPayloadStr) {
+            this.broadcastDashboardUpdate();
+            lastPayloadStr = currentPayloadStr;
+          }
+        }
       } catch (err) {
         console.error('Error in bot tick:', err);
       } finally {
@@ -792,8 +825,8 @@ const tradingBot = {
       winRateVal = (winCount / tradesClosed) * 100;
       avgReturnVal = totalReturnPct / tradesClosed;
     } else {
-      winRateVal = paperTradingStats ? paperTradingStats.win_rate : 0.0;
-      avgReturnVal = paperTradingStats ? (paperTradingStats.profit_factor - 1) * 1.5 : 0.0;
+      winRateVal = paperTradingStats && paperTradingStats.total_trades > 0 ? paperTradingStats.win_rate : null;
+      avgReturnVal = null;
     }
 
     const executionFunnel = {
@@ -872,43 +905,26 @@ const tradingBot = {
       stage8_filled:     cycle.filled
     });
 
-    const todayTradesList = (dbData.trade_logs || []).filter(t => isTodayIST(t.timestamp));
-    const todayBuyTrades = todayTradesList.filter(t => t.action === 'BUY');
-    const todaySellTrades = todayTradesList.filter(t => t.action === 'SELL');
+    const completedTrades = dbData.completed_trades || [];
+    const todayCompletedTrades = completedTrades.filter(t => isTodayIST(t.exit_time));
     
-    let todayPnL = 0;
-    todaySellTrades.forEach(sell => {
-      const matchingBuy = (dbData.trade_logs || []).find(t => t.symbol === sell.symbol && t.action === 'BUY' && new Date(t.timestamp) < new Date(sell.timestamp));
-      if (matchingBuy) {
-        todayPnL += (sell.price - matchingBuy.price) * sell.quantity;
-      }
-    });
+    let todayPnL = todayCompletedTrades.reduce((sum, t) => sum + (Number(t.net_pnl) || 0), 0);
 
+    const todayTradesList = (dbData.trade_logs || []).filter(t => isTodayIST(t.timestamp));
     const today = {
       netPnL: parseFloat(todayPnL.toFixed(2)),
       trades: todayTradesList.length,
       winRate: winRateVal,
-      fees: parseFloat((todayTradesList.reduce((sum, t) => sum + (t.total_value * 0.0005), 0)).toFixed(2)),
-      volume: parseFloat((todayTradesList.reduce((sum, t) => sum + t.total_value, 0)).toFixed(2))
+      fees: parseFloat((todayTradesList.reduce((sum, t) => sum + ((t.total_value || 0) * 0.0005), 0)).toFixed(2)),
+      volume: parseFloat((todayTradesList.reduce((sum, t) => sum + (t.total_value || 0), 0)).toFixed(2))
     };
 
-    const allTrades = dbData.trade_logs || [];
-    const allSellTrades = allTrades.filter(t => t.action === 'SELL');
-    
-    let lifetimePnL = 0;
-    let lifetimeWinCount = 0;
-    allSellTrades.forEach(sell => {
-      const matchingBuy = allTrades.find(t => t.symbol === sell.symbol && t.action === 'BUY' && new Date(t.timestamp) < new Date(sell.timestamp));
-      if (matchingBuy) {
-        const profit = (sell.price - matchingBuy.price) * sell.quantity;
-        lifetimePnL += profit;
-        if (profit > 0) lifetimeWinCount++;
-      }
-    });
+    const lifetimeWinRate = paperTradingStats && paperTradingStats.total_trades > 0 
+      ? paperTradingStats.win_rate 
+      : null;
 
-    const lifetimeWinRate = allSellTrades.length > 0 
-      ? parseFloat(((lifetimeWinCount / allSellTrades.length) * 100).toFixed(2)) 
-      : (paperTradingStats ? paperTradingStats.win_rate : 0.0);
+    let lifetimePnL = paperTradingStats ? paperTradingStats.net_pnl : 0;
+    const allTrades = dbData.trade_logs || [];
 
     const lifetime = {
       netPnL: parseFloat(lifetimePnL.toFixed(2)),
@@ -952,7 +968,7 @@ const tradingBot = {
       'services.scheduler': preMarketState.scheduler,
       'services.market_data': modeString === 'MIXED' ? 'WARNING' : (modeString === 'LIVE' ? 'STABLE' : 'SIMULATED'),
       'services.telegram': tgStatus,
-      'services.scanner': isTicking ? 'ACTIVE' : 'PAUSED',
+      'services.scanner': botInterval !== null ? 'ACTIVE' : 'PAUSED',
       'services.scheduler': 'ACTIVE',
       'market.status': debugData.marketStatus || (this.isMarketOpenWindow() ? 'OPEN' : 'CLOSED'),
       'market.isOpen': this.isMarketOpenWindow(),
@@ -979,7 +995,7 @@ const tradingBot = {
       'scanner.lifetime_scanned_count': scannerStats.lifetime || 0,
       'scanner.scan_speed': scannerStats.symbolsPerMin || 0,
       'scanner.last_scan_timestamp': scannerStats.lastScanTime || 'None',
-      'scanner.scanner_health': isTicking ? 'ACTIVE' : 'PAUSED',
+      'scanner.scanner_health': botInterval !== null ? 'ACTIVE' : 'PAUSED',
       'financials.total_value': valuation.totalVal,
       'financials.net_pnl': netPnL,
       'positions': valuation.holdingStocks || [],
@@ -991,10 +1007,10 @@ const tradingBot = {
     // Push real performance metrics to runtimeState
     runtimeState.updatePerformance({
       today_trades:       today.trades,
-      today_wins:         todayBuyTrades.length > 0 ? Math.round(winRateVal / 100 * todaySellTrades.length) : 0,
-      today_losses:       todaySellTrades.length - Math.round(winRateVal / 100 * todaySellTrades.length),
-      today_win_rate:     winRateVal,
-      today_realized_pnl: today.netPnL,
+      today_wins:         today.winning_trades || 0,
+      today_losses:       today.losing_trades || 0,
+      today_win_rate:     today.winRate || 0,
+      today_realized_pnl: today.netPnL || 0,
       lifetime_trades:    lifetime.trades,
       lifetime_win_rate:  lifetime.winRate
     });
@@ -1039,7 +1055,7 @@ const tradingBot = {
         lifetime,
         scannerStats
       },
-      providerHealth: providerHealth.getHealth(),
+      providerHealth: runtimeState.getSnapshot().provider_health,
       runtime: runtimeState.getSnapshot()
     };
   },
@@ -1051,22 +1067,27 @@ const tradingBot = {
       riskMode = dbData.portfolio_state?.user_instructions?.risk_mode || 'NORMAL';
     } catch (e) {}
 
-    let dailyTarget = Math.max(100.0, parseFloat((valuation.totalVal * 0.10).toFixed(2)));
+    const cap = valuation.totalVal;
+    const riskPerTrade = (runtimeState && runtimeState.getSnapshot().settings.risk_per_trade_percent) || 1.0;
+    const avgRR = 2.5; 
+    const winRate = (runtimeState && runtimeState.state && runtimeState.state.performance && runtimeState.state.performance.today_win_rate > 0)
+      ? runtimeState.state.performance.today_win_rate / 100 
+      : 0.62;
+    const dailyTrades = 7;
+    const expectedProfitPerTrade = (cap * (riskPerTrade / 100)) * ((avgRR * winRate) - (1 - winRate));
+    let dailyTarget = Math.max(100.0, parseFloat((expectedProfitPerTrade * dailyTrades).toFixed(2)));
 
-    if (currentDayStats && currentDayStats.daily_target) {
-      dailyTarget = currentDayStats.daily_target;
+    // Update currentDayStats daily_target to keep it in sync
+    if (typeof currentDayStats !== 'undefined' && currentDayStats && currentDayStats.daily_target !== dailyTarget) {
+      currentDayStats.daily_target = dailyTarget;
     }
 
-    const dailyPnL = currentDayStats ? parseFloat((valuation.totalVal - currentDayStats.start_capital).toFixed(2)) : 0;
+    const dailyPnL = (typeof currentDayStats !== 'undefined' && currentDayStats) ? parseFloat((valuation.totalVal - currentDayStats.start_capital).toFixed(2)) : 0;
     const remainingTarget = Math.max(0, dailyTarget - dailyPnL);
     
-    const winRate = runtimeState.state.performance.today_win_rate > 0
-      ? runtimeState.state.performance.today_win_rate / 100  // Convert from percentage to decimal
-      : 0.55;  // Conservative default when no trade data available
     const avgWin = parseFloat((valuation.totalVal * 0.20 * 0.03).toFixed(2));   // 3% gain on 20% capital allocation
     const avgLoss = parseFloat((valuation.totalVal * 0.20 * 0.015).toFixed(2));  // 1.5% loss on 20% capital stop-loss
-    const expectedProfitPerTrade = (winRate * avgWin) - ((1 - winRate) * avgLoss);
-    const requiredTrades = expectedProfitPerTrade > 0 ? Math.ceil(remainingTarget / expectedProfitPerTrade) : 4;
+    const requiredTrades = expectedProfitPerTrade > 0 ? Math.ceil(remainingTarget / expectedProfitPerTrade) : dailyTrades;
     const requiredCapitalUtil = Math.min(100.0, Math.max(10.0, (requiredTrades * 20.0))); // 20% allocation per trade
     
     let requiredWinRate = winRate;
@@ -1085,22 +1106,14 @@ const tradingBot = {
     let rating = 'HIGH';
     if (remainingTarget <= 0) {
       rating = 'HIGH';
-    } else if (minsRemaining <= 0) {
-      rating = 'UNLIKELY';
-    } else {
-      const tradesPerMin = requiredTrades / minsRemaining;
-      if (tradesPerMin > 0.5 || requiredWinRate > 0.85) {
-        rating = 'UNLIKELY';
-      } else if (requiredWinRate > 0.70 || tradesPerMin > 0.1) {
-        rating = 'LOW';
-      } else if (requiredWinRate > 0.55 || tradesPerMin > 0.05) {
-        rating = 'MEDIUM';
-      } else {
-        rating = 'HIGH';
-      }
+    } else if (requiredTrades > (minsRemaining / 10)) {
+      rating = 'LOW';
+    } else if (requiredWinRate > 0.8) {
+      rating = 'MEDIUM';
     }
 
     return {
+      dailyTarget,
       currentPnL: dailyPnL,
       remainingTarget: parseFloat(remainingTarget.toFixed(2)),
       requiredExpectedProfit: parseFloat(remainingTarget.toFixed(2)),
@@ -1114,15 +1127,7 @@ const tradingBot = {
 
   isMarketOpenWindow(timeInfo) {
     if (!timeInfo) {
-      const now = new Date();
-      const istTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
-      timeInfo = {
-        day: istTime.getDay(),
-        hours: istTime.getHours(),
-        minutes: istTime.getMinutes(),
-        seconds: istTime.getSeconds(),
-        dateStr: `${istTime.getFullYear()}-${String(istTime.getMonth()+1).padStart(2, '0')}-${String(istTime.getDate()).padStart(2, '0')}`
-      };
+      timeInfo = getSystemTime();
     }
     if (timeInfo.day === 0 || timeInfo.day === 6) return false;
     if (typeof isHoliday === 'function' && isHoliday(timeInfo.dateStr)) return false;
@@ -1550,7 +1555,24 @@ const tradingBot = {
         const portfolio = await db.getPortfolioState();
         const startCapital = portfolio.balance + portfolio.equity_value;
         const riskMode = portfolio.user_instructions?.risk_mode || 'NORMAL';
-        const calculatedTarget = Math.max(100.0, parseFloat((Math.max(12000, startCapital) * 0.10).toFixed(2)));
+        const riskPerTrade = (runtimeState && runtimeState.getSnapshot().settings.risk_per_trade_percent) || 1.0;
+      const cap = (typeof valuation !== 'undefined' ? valuation.totalVal : (typeof startCapital !== 'undefined' ? startCapital : 12000));
+      const avgRR = 2.5; 
+      const winRate = 0.62;
+      const dailyTrades = 7;
+      const expectedProfitPerTrade = (cap * (riskPerTrade / 100)) * ((avgRR * winRate) - (1 - winRate));
+      const calculatedTarget = Math.max(100.0, parseFloat((expectedProfitPerTrade * dailyTrades).toFixed(2)));
+      
+      if (runtimeState && runtimeState.targetEngineState) {
+        runtimeState.targetEngineState = {
+          ...runtimeState.targetEngineState,
+          dailyTarget: calculatedTarget,
+          requiredExpectedProfit: calculatedTarget,
+          requiredTradeCount: dailyTrades,
+          requiredWinRate: (winRate * 100).toFixed(0),
+          requiredCapitalUtilization: 85
+        };
+      }
 
         currentDayStats = await db.saveDailyStats({
           date: timeInfo.dateStr,
@@ -1752,10 +1774,10 @@ const tradingBot = {
     // Seed mock prices for all scanned stocks in broker to bypass external rate limits
     if (scanResults) {
       if (scanResults.longs) {
-        scanResults.longs.forEach(item => broker._setMockPrice(item.symbol, item.price));
+        // Mock price overrides removed to preserve production data integrity
       }
       if (scanResults.shorts) {
-        scanResults.shorts.forEach(item => broker._setMockPrice(item.symbol, item.price));
+        // Mock price overrides removed to preserve production data integrity
       }
     }
 
@@ -1788,6 +1810,7 @@ const tradingBot = {
       // 1. One position per symbol check
       if (activePositions.find(p => p.symbol === item.symbol) || pendingExecutions.has(item.symbol)) {
         rejectionReasons.already_held++;
+        if (runtimeState && runtimeState.addRejection) runtimeState.addRejection(item.symbol, 'PORTFOLIO_CHECK', 'Already Held / Pending Entry', { price: item.price, agent: 'System' });
         continue;
       }
 
@@ -1795,6 +1818,7 @@ const tradingBot = {
       const lastEntry = entryCooldowns[item.symbol] || 0;
       if (Date.now() - lastEntry < 5000) {
         rejectionReasons.entry_cooldown++;
+        if (runtimeState && runtimeState.addRejection) runtimeState.addRejection(item.symbol, 'PORTFOLIO_CHECK', 'Entry Cooldown', { price: item.price, agent: 'System' });
         continue;
       }
 
@@ -2466,26 +2490,34 @@ const tradingBot = {
     const remainingTarget = Math.max(0, dailyTarget - dailyPnL);
     
     // Target calculations
-    const winRate = 0.625; // baseline win rate
-    const avgWin = 20.0;
-    const avgLoss = 10.0;
-    const expectedProfitPerTrade = (winRate * avgWin) - ((1 - winRate) * avgLoss);
+    const lifetimeWinRate = runtimeState.state.performance.lifetime_win_rate || 0;
+    const todayWinRate = runtimeState.state.performance.today_win_rate || 0;
+    const winRate = todayWinRate > 0 ? (todayWinRate / 100) : (lifetimeWinRate > 0 ? (lifetimeWinRate / 100) : null);
     
-    const requiredTrades = expectedProfitPerTrade > 0 ? Math.ceil(remainingTarget / expectedProfitPerTrade) : 50;
-    const requiredWinRate = requiredTrades > 0 && remainingTarget > 0 
-      ? Math.max(0.40, Math.min(0.95, (remainingTarget / requiredTrades + avgLoss) / (avgWin + avgLoss)))
-      : winRate;
-    
-    const requiredCapitalUtil = Math.min(90.0, Math.max(10.0, (requiredTrades * 1500) / valuation.totalVal * 100));
+    // We cannot assume avgWin / avgLoss without real historical trades. 
+    // If no trades exist, these remain undefined.
+    let expectedProfitPerTrade = null;
+    let requiredTrades = null;
+    let requiredWinRate = null;
+    let requiredCapitalUtil = null;
+    let requiredOpportunityDensity = null;
     const hoursRemaining = Math.max(0.5, (15 * 60 + 30 - currentMins) / 60);
-    const requiredOpportunityDensity = parseFloat((requiredTrades / hoursRemaining).toFixed(2));
+
+    // If we have no historical winRate to build models from, do not fabricate estimates.
+    if (winRate !== null) {
+      // In a full implementation, these would also come from runtimeState performance.
+      // Since they are not tracked yet, we leave them as null to trigger 'Unavailable' on the UI.
+    }
     
     console.log(`\n🎯 TARGET ENGINE PLANNING & ADAPTATION [${timeInfo.hours.toString().padStart(2, '0')}:${timeInfo.minutes.toString().padStart(2, '0')}]`);
     console.log(`• Daily Target: ₹${dailyTarget} | Current PnL: ₹${dailyPnL.toFixed(2)} (Progress: ${((dailyPnL/dailyTarget)*100).toFixed(1)}%)`);
-    console.log(`• Remaining Target: ₹${remainingTarget.toFixed(2)}`);
-    console.log(`• Required Setups to Target: ${requiredTrades} | Required Expected Return: ₹${expectedProfitPerTrade.toFixed(2)}`);
-    console.log(`• Required Win Rate: ${(requiredWinRate * 100).toFixed(1)}% | Required Capital Util: ${requiredCapitalUtil.toFixed(1)}%`);
-    console.log(`• Required Opportunity Density: ${requiredOpportunityDensity} setups/hour`);
+    if (expectedProfitPerTrade !== null) {
+      console.log(`• Required Setups to Target: ${requiredTrades} | Required Expected Return: ₹${expectedProfitPerTrade.toFixed(2)}`);
+      console.log(`• Required Win Rate: ${(requiredWinRate * 100).toFixed(1)}% | Required Capital Util: ${requiredCapitalUtil.toFixed(1)}%`);
+      console.log(`• Required Opportunity Density: ${requiredOpportunityDensity} setups/hour`);
+    } else {
+      console.log(`• Required Targets: Insufficient trade history to compute target reachability metrics.`);
+    }
 
     // Target adaptation: if behind target (progress < expected progress based on time)
     // Market runs from 09:15 to 15:30 (375 minutes). Let's calculate expected progress:
@@ -2515,12 +2547,13 @@ const tradingBot = {
         timestamp: new Date().toISOString(),
         time: `${timeInfo.hours.toString().padStart(2, '0')}:${timeInfo.minutes.toString().padStart(2, '0')}`,
         dailyPnL,
-        remainingTarget,
-        requiredTrades,
-        requiredWinRate: Number(requiredWinRate.toFixed(4)),
-        requiredCapitalUtil: Number(requiredCapitalUtil.toFixed(2)),
-        requiredOpportunityDensity,
-        reasoning: adaptationReasoning
+        remainingTarget: Number(remainingTarget.toFixed(2)),
+        requiredExpectedProfit: expectedProfitPerTrade !== null ? Number(expectedProfitPerTrade.toFixed(2)) : undefined,
+        requiredTradeCount: requiredTrades !== null ? requiredTrades : undefined,
+        requiredWinRate: requiredWinRate !== null ? Number((requiredWinRate * 100).toFixed(2)) : undefined,
+        requiredCapitalUtilization: requiredCapitalUtil !== null ? Number(requiredCapitalUtil.toFixed(2)) : undefined,
+        requiredOpportunityDensity: requiredOpportunityDensity !== null ? Number(requiredOpportunityDensity.toFixed(2)) : undefined,
+        adaptationReasoning
       });
       db.writeLocalDb(dbData);
     } catch(e) {}
@@ -2608,7 +2641,24 @@ const tradingBot = {
       const portfolio = await db.getPortfolioState();
       const startCapital = portfolio.balance + portfolio.equity_value;
       const riskMode = portfolio.user_instructions?.risk_mode || 'NORMAL';
-      const calculatedTarget = Math.max(100.0, parseFloat((Math.max(12000, startCapital) * 0.10).toFixed(2)));
+      const riskPerTrade = (runtimeState && runtimeState.getSnapshot().settings.risk_per_trade_percent) || 1.0;
+      const cap = (typeof valuation !== 'undefined' ? valuation.totalVal : (typeof startCapital !== 'undefined' ? startCapital : 12000));
+      const avgRR = 2.5; 
+      const winRate = 0.62;
+      const dailyTrades = 7;
+      const expectedProfitPerTrade = (cap * (riskPerTrade / 100)) * ((avgRR * winRate) - (1 - winRate));
+      const calculatedTarget = Math.max(100.0, parseFloat((expectedProfitPerTrade * dailyTrades).toFixed(2)));
+      
+      if (runtimeState && runtimeState.targetEngineState) {
+        runtimeState.targetEngineState = {
+          ...runtimeState.targetEngineState,
+          dailyTarget: calculatedTarget,
+          requiredExpectedProfit: calculatedTarget,
+          requiredTradeCount: dailyTrades,
+          requiredWinRate: (winRate * 100).toFixed(0),
+          requiredCapitalUtilization: 85
+        };
+      }
 
       currentDayStats = {
         date: dateStr,

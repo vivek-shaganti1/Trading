@@ -233,6 +233,15 @@ function stopHeartbeat() {
 
 // Update Dashboard UI Elements
 function updateUI(data) {
+  const banner = document.getElementById('market-closed-banner');
+  if (banner && data.marketDataDiagnostics) {
+    if (data.marketDataDiagnostics['market.isOpen'] === false) {
+      banner.style.display = 'flex';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+
   window.lastUpdateTimestamp = Date.now();
   
   // Cache prediction
@@ -241,12 +250,18 @@ function updateUI(data) {
   }
 
   // Update running indicators
-  isBotRunning = data.isRunning;
-  if (isBotRunning) {
-    botStatusDot.className = 'status-dot connected';
+  // If data is wrapped in runtime (from WS or new API format), use it
+  const rts = data.runtime || data;
+  
+  const botStatusDot = document.getElementById('bot-status-dot');
+  const botStatusText = document.getElementById('bot-status-text');
+  const btnToggleBot = document.getElementById('btn-toggle-bot');
+  
+  if (rts.isRunning) {
+    botStatusDot.className = 'status-dot';
     botStatusText.innerText = 'Bot: Active';
     btnToggleBot.innerHTML = '<i data-lucide="square"></i> <span>Stop Bot</span>';
-    btnToggleBot.className = 'btn btn-secondary w-full';
+    btnToggleBot.className = 'btn btn-danger w-full';
   } else {
     botStatusDot.className = 'status-dot disconnected';
     botStatusText.innerText = 'Bot: Inactive';
@@ -255,7 +270,7 @@ function updateUI(data) {
   }
 
   // Update System Time
-  window.lastServerTime = data.time;
+  window.lastServerTime = rts.market ? rts.market.clock : (rts.time || new Date().toISOString());
 
   // Update Valuation & Profit Command Center
   const statTotalValEl = document.getElementById('stat-total-value');
@@ -263,16 +278,28 @@ function updateUI(data) {
   const statBalanceEl = document.getElementById('stat-balance');
   const statEquityEl = document.getElementById('stat-equity');
 
-  if (statTotalValEl) statTotalValEl.innerText = '₹' + Number(data.totalVal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (statBalanceEl) statBalanceEl.innerText = '₹' + Number(data.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (statEquityEl) statEquityEl.innerText = '₹' + Number(data.equityValue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatCurrency = (val) => val === undefined || val === null ? 'Unavailable' : '₹' + Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  
+  // Backwards compatibility for data.totalVal, or read from rts.financials
+  const totalVal = data.totalVal !== undefined ? data.totalVal : (rts.financials ? rts.financials.total_value : null);
+  const balance = data.balance !== undefined ? data.balance : (rts.financials ? rts.financials.cash : null);
+  const equityValue = data.equityValue !== undefined ? data.equityValue : (rts.financials ? rts.financials.equity_value : null);
+  const netPnL = data.netPnL !== undefined ? data.netPnL : (rts.financials ? rts.financials.net_pnl : null);
 
-  const netPnL = data.netPnL || 0;
-  const pnlPercent = ((netPnL / (data.totalVal || data.balance || 1)) * 100).toFixed(2);
-  const pnlPrefix = netPnL >= 0 ? '+' : '';
+  if (statTotalValEl) statTotalValEl.innerText = formatCurrency(totalVal);
+  if (statBalanceEl) statBalanceEl.innerText = formatCurrency(balance);
+  if (statEquityEl) statEquityEl.innerText = formatCurrency(equityValue);
+
   if (statNetPnLEl) {
-    statNetPnLEl.innerText = `${pnlPrefix}₹${Number(netPnL).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${pnlPrefix}${pnlPercent}%)`;
-    statNetPnLEl.className = netPnL >= 0 ? 'pnl-badge positive' : 'pnl-badge negative';
+    if (netPnL === undefined || netPnL === null) {
+      statNetPnLEl.innerText = 'Unavailable';
+      statNetPnLEl.className = 'pnl-badge';
+    } else {
+      const pnlPercent = totalVal ? ((netPnL / totalVal) * 100).toFixed(2) : '0.00';
+      const pnlPrefix = netPnL >= 0 ? '+' : '';
+      statNetPnLEl.innerText = `${pnlPrefix}₹${Number(netPnL).toLocaleString('en-IN', { minimumFractionDigits: 2 })} (${pnlPrefix}${pnlPercent}%)`;
+      statNetPnLEl.className = netPnL >= 0 ? 'pnl-badge positive' : 'pnl-badge negative';
+    }
   }
 
   // Daily Target Math & Reachability calculator (Phase 9)
@@ -284,11 +311,11 @@ function updateUI(data) {
   if (targetProgressBar) targetProgressBar.style.width = `${progressPercent}%`;
 
   if (data.targetEngineState) {
-    if (targetRemaining) targetRemaining.innerText = `₹${Number(data.targetEngineState.remainingTarget || 0).toFixed(2)}`;
-    if (targetRequiredProfit) targetRequiredProfit.innerText = `₹${Number(data.targetEngineState.requiredExpectedProfit || 0).toFixed(2)}`;
-    if (targetRequiredTrades) targetRequiredTrades.innerText = data.targetEngineState.requiredTradeCount || 0;
-    if (targetRequiredWinrate) targetRequiredWinrate.innerText = `${data.targetEngineState.requiredWinRate || 0}%`;
-    if (targetCapitalUtilization) targetCapitalUtilization.innerText = `${data.targetEngineState.requiredCapitalUtilization || 0}%`;
+    if (targetRemaining) targetRemaining.innerText = data.targetEngineState.remainingTarget !== undefined ? `₹${Number(data.targetEngineState.remainingTarget).toFixed(2)}` : 'N/A';
+    if (targetRequiredProfit) targetRequiredProfit.innerText = data.targetEngineState.requiredExpectedProfit !== undefined ? `₹${Number(data.targetEngineState.requiredExpectedProfit).toFixed(2)}` : 'N/A';
+    if (targetRequiredTrades) targetRequiredTrades.innerText = data.targetEngineState.requiredTradeCount !== undefined ? data.targetEngineState.requiredTradeCount : 'N/A';
+    if (targetRequiredWinrate) targetRequiredWinrate.innerText = data.targetEngineState.requiredWinRate !== undefined ? `${data.targetEngineState.requiredWinRate}%` : 'N/A';
+    if (targetCapitalUtilization) targetCapitalUtilization.innerText = data.targetEngineState.requiredCapitalUtilization !== undefined ? `${data.targetEngineState.requiredCapitalUtilization}%` : 'N/A';
   }
 
   // Target Reachability calculations
@@ -376,17 +403,17 @@ function updateUI(data) {
       todayNetPnL.innerText = '₹' + Number(m.today.netPnL || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
       todayNetPnL.style.color = (m.today.netPnL || 0) >= 0 ? '#10b981' : '#ef4444';
     }
-    if (todayTotalTrades && m.today) todayTotalTrades.innerText = m.today.trades || 0;
-    if (todayWinRate && m.today) todayWinRate.innerText = Number(m.today.winRate || 0).toFixed(1) + '%';
-    if (todayFees && m.today) todayFees.innerText = '₹' + Number(m.today.fees || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
-    if (todayVolume && m.today) todayVolume.innerText = '₹' + Number(m.today.volume || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    if (todayTotalTrades && m.today) todayTotalTrades.innerText = m.today.trades !== undefined ? m.today.trades : 'N/A';
+    if (todayWinRate && m.today) todayWinRate.innerText = m.today.winRate !== undefined ? Number(m.today.winRate).toFixed(1) + '%' : 'N/A';
+    if (todayFees && m.today) todayFees.innerText = m.today.fees !== undefined ? '₹' + Number(m.today.fees).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : 'N/A';
+    if (todayVolume && m.today) todayVolume.innerText = m.today.volume !== undefined ? '₹' + Number(m.today.volume).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : 'N/A';
 
     if (lifetimeNetPnL && m.lifetime) {
       lifetimeNetPnL.innerText = '₹' + Number(m.lifetime.netPnL || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
       lifetimeNetPnL.style.color = (m.lifetime.netPnL || 0) >= 0 ? '#10b981' : '#ef4444';
     }
-    if (lifetimeTotalTrades && m.lifetime) lifetimeTotalTrades.innerText = m.lifetime.trades || 0;
-    if (lifetimeWinRate && m.lifetime) lifetimeWinRate.innerText = Number(m.lifetime.winRate || 0).toFixed(1) + '%';
+    if (lifetimeTotalTrades && m.lifetime) lifetimeTotalTrades.innerText = m.lifetime.trades !== undefined ? m.lifetime.trades : 'N/A';
+    if (lifetimeWinRate && m.lifetime) lifetimeWinRate.innerText = m.lifetime.winRate !== undefined ? Number(m.lifetime.winRate).toFixed(1) + '%' : 'N/A';
   }
 
   // Update Funnel Visualizer (Phase 3)
@@ -630,7 +657,7 @@ function updateDecisionExplainer(predictionOrReport, isFromDb = false) {
     symbol = p.symbol || '';
     signal = p.signal || 'BUY';
     confidenceVal = Number(p.confidence || 0);
-    tqsVal = p.participating_models?.agent4_technical?.indicators?.rsi ? Math.round(p.participating_models.agent4_technical.indicators.rsi * 1.3) : 76;
+    tqsVal = p.tqs || p.technical_score || 0;
     riskStatus = p.participating_models?.agent7_risk?.signal || 'PASS';
     votes = p.participating_models || {};
     reasoning = p.reasoning || 'Debated signal approved.';
@@ -736,23 +763,24 @@ window.inspectFunnelStage = function(stageName, count) {
   
   modal.classList.add('active');
 
-  // Read rejection data from last status payload instead of hardcoded mocks
   const rejections = window._lastStatusData && window._lastStatusData.runtime
     ? (window._lastStatusData.runtime.funnel || {}).last_rejected || []
     : [];
 
-  // Filter rejections relevant to this stage if possible
-  const stageRejections = rejections.filter(r => (r.stage || '') === stageName);
+  // Loosen strict filter so we always show reasons if specific stage matching fails
+  let stageRejections = rejections.filter(r => (r.stage || '').includes(stageName) || stageName.includes(r.stage));
+  if (stageRejections.length === 0 && rejections.length > 0) {
+    stageRejections = rejections.slice(0, 5); // Show latest 5 as fallback
+  }
+
   const list = stageRejections.length > 0
-    ? stageRejections.map(r => r.reason || `${r.symbol || 'Unknown'} — rejected`)
-    : (rejections.length > 0
-      ? ['No rejections logged at this specific stage.']
-      : ['No rejection data available — connect to runtimeState.funnel.last_rejected']);
+    ? stageRejections.map(r => `<strong>${r.symbol || 'Unknown'}</strong>: ${r.reason || 'Rejected'} <br><small>Agent: ${r.agent || 'System'} | Time: ${r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : '--'}</small>`)
+    : ['No rejection data logged in current run.'];
 
   modalBody.innerHTML = `
-    <h4 style="margin-bottom: 10px; color: var(--accent-blue);">Failed Candidates for stage: ${stageName}</h4>
+    <h4 style="margin-bottom: 10px; color: var(--accent-blue);">Recent Failed Candidates</h4>
     <ul style="padding-left: 15px; font-size: 0.75rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 8px;">
-      ${list.map(item => `<li>${item}</li>`).join('')}
+      ${list.map(item => `<li style="padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">${item}</li>`).join('')}
     </ul>
   `;
 };
@@ -774,10 +802,10 @@ function updateActivePositions(holdings, prices) {
   }
 
   container.innerHTML = holdings.map(h => {
-    const ltp = prices ? prices[h.symbol] || h.avgPrice : h.avgPrice;
-    const currentVal = ltp * h.quantity;
+    const ltp = h.current_price || h.ltp || (prices ? prices[h.symbol] || h.avgPrice : h.avgPrice);
+    const currentVal = h.current_value || (ltp * h.quantity);
     const buyVal = h.avgPrice * h.quantity;
-    const pnl = parseFloat((currentVal - buyVal).toFixed(2));
+    const pnl = h.unrealized_pnl || parseFloat((currentVal - buyVal).toFixed(2));
     const pnlClass = pnl >= 0 ? 'text-green' : 'text-red';
     const pnlPrefix = pnl >= 0 ? '+' : '';
 
@@ -1430,7 +1458,7 @@ function updateChartWithData(candles, indicators = null, consensus = null) {
   const stopLoss = stopLossVal;
   const rrr = Math.abs(targetPrice - entryPrice) / Math.max(0.01, Math.abs(entryPrice - stopLoss));
 
-  const tqsVal = consensus?.tqs || (rsis.length > 0 ? Math.round(rsis[rsis.length - 1].value * 1.2) : 75);
+  const tqsVal = consensus?.tqs || 0;
   const confidenceVal = consensus?.final_confidence || consensus?.confidence || 0.82;
 
   let buyVotes = 0;
@@ -1446,17 +1474,9 @@ function updateChartWithData(candles, indicators = null, consensus = null) {
       votesBreakdownHtml += `<div class="flex-between" style="padding: 2px 4px; background: rgba(255,255,255,0.02); border-radius: 2px;"><span>${cleanName}:</span><b>${sig}</b></div>`;
     });
   } else {
-    // Generate fallback dummy votes for aesthetics
-    totalVotes = 9;
-    buyVotes = 7;
-    votesBreakdownHtml = `
-      <div class="flex-between"><span>Ag1 (ML):</span><b>BUY</b></div>
-      <div class="flex-between"><span>Ag2 (Gemini):</span><b>BUY</b></div>
-      <div class="flex-between"><span>Ag3 (Groq):</span><b>BUY</b></div>
-      <div class="flex-between"><span>Ag4 (Tech):</span><b>BUY</b></div>
-      <div class="flex-between"><span>Ag5 (Context):</span><b>BUY</b></div>
-      <div class="flex-between"><span>Ag7 (Risk):</span><b>PASS</b></div>
-    `;
+    totalVotes = 0;
+    buyVotes = 0;
+    votesBreakdownHtml = `<div class="flex-between"><span>No agent consensus available.</span></div>`;
   }
 
   // Update AI Decision Panel DOM elements
@@ -1505,12 +1525,12 @@ function updateChartWithData(candles, indicators = null, consensus = null) {
 
   if (emaTrend === 'BULLISH' && lastRsi > 45 && volumeConfirmation.includes('HIGH')) {
     predictedDirection = 'BUY';
-    probability = data.prediction ? Math.round((data.prediction.confidence || 0.5) * 100) : 50;
-    expectedMove = data.prediction && data.prediction.reasoning ? 0.0 : 0.0;  // Real value from backend when available
+    probability = consensus ? Math.round((consensus.final_confidence || consensus.confidence || 0.5) * 100) : 50;
+    expectedMove = consensus && consensus.expectedMove ? consensus.expectedMove : 0.0;
   } else if (emaTrend === 'BEARISH' && lastRsi < 55) {
     predictedDirection = 'SELL';
-    probability = data.prediction ? Math.round((data.prediction.confidence || 0.5) * 100) : 50;
-    expectedMove = data.prediction && data.prediction.reasoning ? 0.0 : 0.0;  // Real value from backend when available
+    probability = consensus ? Math.round((consensus.final_confidence || consensus.confidence || 0.5) * 100) : 50;
+    expectedMove = consensus && consensus.expectedMove ? consensus.expectedMove : 0.0;
   }
 
   const expectedTargetPrice = predictedDirection === 'BUY' ? currentPrice * (1 + expectedMove/100) : currentPrice * (1 - expectedMove/100);
@@ -1682,19 +1702,24 @@ async function fetchTradesHistory() {
 
 // Controls Events
 btnToggleBot.addEventListener('click', async () => {
+  const pwd = prompt("Enter admin password to toggle bot:");
+  if (!pwd) return;
   const action = isBotRunning ? 'STOP' : 'START';
   try {
     const res = await fetch(`${backendBase}/api/control`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action })
+      body: JSON.stringify({ action, password: pwd })
     });
     const result = await res.json();
     if (result.success) {
       setTimeout(fetchTradesHistory, 500);
+    } else {
+      alert("Toggle failed: " + (result.error || "Unknown error"));
     }
   } catch (err) {
     console.error('Bot toggle request failed:', err);
+    alert('Bot toggle request failed: ' + err.message);
   }
 });
 
@@ -1938,12 +1963,12 @@ function drawHeatmap() {
   if (!container) return;
   
   let html = '';
-  // V10.1: Connect to real agent confidence from data.agentLeaderboard
-  const heatmapLeaderboard = (typeof data !== 'undefined' && data.agentLeaderboard) ? data.agentLeaderboard : {};
+  // V10.1: Connect to real agent confidence from window.lastDashboardData
+  const heatmapLeaderboard = (typeof window !== 'undefined' && window.lastDashboardData && window.lastDashboardData.agentLeaderboard) ? window.lastDashboardData.agentLeaderboard : {};
   const heatmapAgentIds = Object.keys(heatmapLeaderboard);
   if (heatmapAgentIds.length > 0) {
     heatmapAgentIds.forEach((id, i) => {
-      const confidence = heatmapLeaderboard[id].weight || 0.5;
+      const confidence = heatmapLeaderboard[id].weight || 0.0;
       const color = `rgba(16, 185, 129, ${confidence.toFixed(2)})`;
       html += `
         <div style="background: ${color}; border-radius: 4px; padding: 6px; text-align: center; color: black; font-weight: bold;">
@@ -1952,15 +1977,11 @@ function drawHeatmap() {
       `;
     });
   } else {
-    for (let i = 1; i <= 8; i++) {
-      const confidence = 0.5; // V10.1: Connect to real agent confidence
-      const color = `rgba(16, 185, 129, ${confidence.toFixed(2)})`;
-      html += `
-        <div style="background: ${color}; border-radius: 4px; padding: 6px; text-align: center; color: black; font-weight: bold;">
-          A${i}<br>${(confidence * 100).toFixed(0)}%
-        </div>
-      `;
-    }
+    html += `
+      <div style="grid-column: span 4; text-align: center; color: rgba(255,255,255,0.4); font-size: 11px;">
+        Awaiting agent data...
+      </div>
+    `;
   }
   container.innerHTML = html;
 }

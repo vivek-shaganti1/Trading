@@ -6,7 +6,7 @@ const marketModel = require('./marketModel');
 const agent3_technicals = require('./agent3_technicals');
 const agent4_context = require('./agent4_context');
 const dynamicThreshold = require('./dynamicThreshold');
-const providerHealth = require('./providerHealth');
+const runtimeState = require('./runtimeState');
 const priceActionAgent = require('./priceActionStructureAgent');
 const confidenceEngine = require('./confidenceEngine');
 const institutionalConfluenceEngine = require('./institutionalConfluenceEngine');
@@ -21,7 +21,6 @@ const marketStateClassifier = require('./marketStateClassifier');
 const marketStructureHierarchy = require('./marketStructureHierarchy');
 const bayesianConfidenceEngine = require('./bayesianConfidenceEngine');
 const stopTargetEngine = require('./stopTargetEngine');
-const runtimeState = require('./runtimeState');
 
 
 
@@ -93,7 +92,7 @@ async function callGemini(symbol, ltp, pred1, pred4, pred5) {
 
     if (response.ok) {
       const latencyMs = Date.now() - startTime;
-      providerHealth.recordCall('Gemini', startTime, true, '200 OK');
+      runtimeState.updateProviderHealth('Gemini', startTime, true, '200 OK');
       runtimeState.updateProviderHealth('gemini', latencyMs, true);
       const resData = await response.json();
       const text = resData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -106,12 +105,12 @@ async function callGemini(symbol, ltp, pred1, pred4, pred5) {
       };
     } else {
       const latencyMs = Date.now() - startTime;
-      providerHealth.recordCall('Gemini', startTime, false, `Status ${response.status}`);
+      runtimeState.updateProviderHealth('Gemini', startTime, false, `Status ${response.status}`);
       runtimeState.updateProviderHealth('gemini', latencyMs, false);
     }
   } catch (err) {
     const latencyMs = Date.now() - startTime;
-    providerHealth.recordCall('Gemini', startTime, false, err.message);
+    runtimeState.updateProviderHealth('Gemini', startTime, false, err.message);
     runtimeState.updateProviderHealth('gemini', latencyMs, false);
     console.warn(`[GEMINI API] Failed: ${err.message}. Running fallback...`);
   }
@@ -192,7 +191,7 @@ async function callGroq(symbol, ltp, pred1, pred4, pred5) {
     clearTimeout(timeoutId);
 
     if (response.ok) {
-      providerHealth.recordCall('Groq', startTime, true, '200 OK');
+      runtimeState.updateProviderHealth('Groq', startTime, true, '200 OK');
       const resData = await response.json();
       const text = resData?.choices?.[0]?.message?.content || '';
       const parsed = JSON.parse(text);
@@ -202,10 +201,10 @@ async function callGroq(symbol, ltp, pred1, pred4, pred5) {
         reasoning: parsed.debate_summary || 'Groq dynamic analysis'
       };
     } else {
-      providerHealth.recordCall('Groq', startTime, false, `Status ${response.status}`);
+      runtimeState.updateProviderHealth('Groq', startTime, false, `Status ${response.status}`);
     }
   } catch (err) {
-    providerHealth.recordCall('Groq', startTime, false, err.message);
+    runtimeState.updateProviderHealth('Groq', startTime, false, err.message);
     console.warn(`[GROQ API] Failed: ${err.message}. Running fallback...`);
   }
   return runGroqFallback(symbol, pred4?.indicators);

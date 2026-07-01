@@ -70,6 +70,12 @@
       </div>
     </header>
 
+    <!-- Market Closed Banner -->
+    <div id="market-closed-banner" style="display: none; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 10px 20px; border-radius: 8px; margin-bottom: 15px; font-weight: 600; text-align: center; font-size: 0.9rem; align-items: center; justify-content: center; gap: 10px;">
+      <i data-lucide="alert-triangle" style="width: 18px; height: 18px;"></i>
+      MARKET CLOSED — All automated scanning and executions are paused.
+    </div>
+
     <!-- Execution Timeline (Phase 8) -->
     <div class="card glass-card timeline-card-row">
       <div class="timeline-title-area">
@@ -183,12 +189,12 @@
           <div class="reachability-box" style="margin-top: 15px; padding: 10px; border-radius: 8px; background: rgba(59, 130, 246, 0.04); border: 1px solid rgba(59, 130, 246, 0.1);">
             <div class="flex-between">
               <span class="text-xs font-semibold">Target Reachability Rating</span>
-              <span id="target-reachability-badge" class="badge bg-green">HIGH</span>
+              <span id="target-reachability-badge" class="badge bg-green">--</span>
             </div>
             <div id="target-math-calculations" class="text-xxs monospace" style="color: rgba(255,255,255,0.5); margin-top: 6px; line-height: 1.3;">
-              Remaining Target: ₹1,000<br>
-              Required Win Rate: 65%<br>
-              Projected EOD: ₹12,180
+              Remaining Target: --<br>
+              Required Win Rate: --<br>
+              Projected EOD: --
             </div>
           </div>
 
@@ -223,15 +229,15 @@
           <div class="risk-limits-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
             <div class="risk-indicator">
               <span class="risk-label">Daily Stop-Loss</span>
-              <span id="risk-daily-limit" class="risk-value red">-₹360.00</span>
+              <span id="risk-daily-limit" class="risk-value red">--</span>
             </div>
             <div class="risk-indicator">
               <span class="risk-label">Max Lifetime Loss</span>
-              <span id="risk-lifetime-limit" class="risk-value red">-₹4,000.00</span>
+              <span id="risk-lifetime-limit" class="risk-value red">--</span>
             </div>
             <div class="risk-indicator" style="grid-column: span 2;">
               <span class="risk-label">Strategy Mode</span>
-              <span id="active-strategy" class="strategy-badge day-trading w-full text-center" style="display: block; margin-top: 4px;">DAY_TRADING</span>
+              <span id="active-strategy" class="strategy-badge day-trading w-full text-center" style="display: block; margin-top: 4px;">--</span>
             </div>
           </div>
         </div>
@@ -253,24 +259,7 @@
                 </tr>
               </thead>
               <tbody id="provider-health-body">
-                <tr>
-                  <td>Gemini</td>
-                  <td class="monospace font-semibold text-green">120ms</td>
-                  <td class="text-green">100%</td>
-                  <td>200 OK</td>
-                </tr>
-                <tr>
-                  <td>Groq</td>
-                  <td class="monospace font-semibold text-green">85ms</td>
-                  <td class="text-green">100%</td>
-                  <td>200 OK</td>
-                </tr>
-                <tr>
-                  <td>Postgres</td>
-                  <td class="monospace font-semibold text-green">5ms</td>
-                  <td class="text-green">100%</td>
-                  <td>Connected</td>
-                </tr>
+                <tr><td colspan="4" class="text-center">Awaiting metrics...</td></tr>
               </tbody>
             </table>
           </div>
@@ -425,24 +414,24 @@
           
           <div id="why-trade-explainer-content">
             <div class="explainer-header flex-between">
-              <h3 id="explainer-symbol" class="text-xl font-bold">RELIANCE</h3>
-              <span id="explainer-decision" class="badge bg-green">BUY</span>
+              <h3 id="explainer-symbol" class="text-xl font-bold">--</h3>
+              <span id="explainer-decision" class="badge bg-green">--</span>
             </div>
             <div class="metrics-pill-row" style="display: flex; gap: 8px; margin-top: 10px;">
-              <span class="pill">TQS: <b id="explainer-tqs">86</b></span>
-              <span class="pill">Confidence: <b id="explainer-confidence">0.77</b></span>
-              <span class="pill">Risk: <b id="explainer-risk" class="text-green">PASS</b></span>
-              <span class="pill">Consensus: <b id="explainer-consensus">8/10</b></span>
+              <span class="pill">TQS: <b id="explainer-tqs">--</b></span>
+              <span class="pill">Confidence: <b id="explainer-confidence">--</b></span>
+              <span class="pill">Risk: <b id="explainer-risk" class="text-green">--</b></span>
+              <span class="pill">Consensus: <b id="explainer-consensus">--</b></span>
             </div>
 
             <h4 class="section-subheading" style="margin-top: 14px; margin-bottom: 6px; font-size: 0.75rem; text-transform: uppercase;">Agent Vote Registry</h4>
             <div class="votes-grid">
-              <div class="vote-item"><span>ML Model</span><b id="vote-ml">BUY</b></div>
-              <div class="vote-item"><span>Gemini</span><b id="vote-gemini">BUY</b></div>
-              <div class="vote-item"><span>Groq</span><b id="vote-groq">BUY</b></div>
-              <div class="vote-item"><span>Risk Manager</span><b id="vote-risk">BUY</b></div>
-              <div class="vote-item"><span>Context Engine</span><b id="vote-context">HOLD</b></div>
-              <div class="vote-item"><span>Breadth Engine</span><b id="vote-breadth">BUY</b></div>
+              <div class="vote-item"><span>ML Model</span><b id="vote-ml">--</b></div>
+              <div class="vote-item"><span>Gemini</span><b id="vote-gemini">--</b></div>
+              <div class="vote-item"><span>Groq</span><b id="vote-groq">--</b></div>
+              <div class="vote-item"><span>Risk Manager</span><b id="vote-risk">--</b></div>
+              <div class="vote-item"><span>Context Engine</span><b id="vote-context">--</b></div>
+              <div class="vote-item"><span>Breadth Engine</span><b id="vote-breadth">--</b></div>
             </div>
           </div>
         </div>
@@ -462,24 +451,7 @@
                 </tr>
               </thead>
               <tbody id="agent-war-room-body">
-                <tr class="agent-profitable">
-                  <td>ML Ensemble</td>
-                  <td>68%</td>
-                  <td class="font-semibold text-green">BUY</td>
-                  <td class="text-green">+₹2,840</td>
-                </tr>
-                <tr class="agent-neutral">
-                  <td>Gemini 2.0</td>
-                  <td>51%</td>
-                  <td class="font-semibold text-green">BUY</td>
-                  <td class="text-green">+₹820</td>
-                </tr>
-                <tr class="agent-losing">
-                  <td>Context</td>
-                  <td>39%</td>
-                  <td class="font-semibold text-yellow">HOLD</td>
-                  <td class="text-red">-₹380</td>
-                </tr>
+                <tr><td colspan="4" class="text-center">Awaiting agent leaderboard data...</td></tr>
               </tbody>
             </table>
           </div>
@@ -545,7 +517,7 @@
           <h3 class="text-sm font-semibold" style="margin-bottom: 8px; color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 6px;"><i data-lucide="pie-chart"></i> Asset Allocation</h3>
           <div style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 12px; font-size: 0.75rem;">
             <div id="allocation-breakdown" style="display: flex; flex-direction: column; gap: 8px;">
-              <div>Cash: <b id="inst-alloc-cash">₹12,000.00</b></div>
+              <div>Cash: <b id="inst-alloc-cash">--</b></div>
             </div>
           </div>
           

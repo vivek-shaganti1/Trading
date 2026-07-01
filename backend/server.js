@@ -54,6 +54,12 @@ function validateConfig() {
     console.log('⚠️ TELEGRAM_CHAT_ID missing');
   }
 
+  if (config.ADMIN_RESET_PASSWORD) {
+    console.log('✅ ADMIN_RESET_PASSWORD');
+  } else {
+    console.log('⚠️ ADMIN_RESET_PASSWORD missing (API controls disabled)');
+  }
+
   console.log('=========================================');
 
   if (hasErrors) {
@@ -117,10 +123,10 @@ app.get('/trade-analysis', (req, res) => {
 app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 // API: Get current status
-app.get('/api/status', (req, res) => {
+app.get('/api/status', async (req, res) => {
   try {
-    const status = runtimeState.getSnapshot();
-    res.json(status);
+    const statusData = await tradingBot.getStatus();
+    res.json(statusData);
   } catch (err) {
     structuredErrorLog('API', req, err);
     res.status(500).json({ error: 'Internal Server Error', code: 'SERVER_ERROR' });
@@ -267,7 +273,10 @@ app.get('/api/broker', async (req, res) => {
 // API: Start/Stop bot
 app.post('/api/control', async (req, res) => {
   try {
-    const { action } = req.body;
+    const { action, password } = req.body;
+    if (password !== config.ADMIN_RESET_PASSWORD) {
+      return res.status(403).json({ error: 'Unauthorized: Incorrect admin password.' });
+    }
     console.log(`[API CONTROL] Action: ${action} received.`);
     if (action === 'START') {
       tradingBot.resumeEntries();
@@ -373,7 +382,7 @@ app.get('/api/market-breadth', async (req, res) => {
       else bearish++;
     });
     
-    if (bullish === 0 && bearish === 0) { bullish = 3; bearish = 2; }
+    // Removed fallback simulation: If zero, return zero.
     res.json({ bullish, bearish });
   } catch (err) {
     structuredErrorLog('API', req, err);
@@ -702,7 +711,7 @@ app.get('/api/intelligence-report', async (req, res) => {
     const adaptationScore = Math.min(100, 40 + trustLogs * 10);
     
     // 4. Recovery Score
-    const recoveryScore = 100; // Continuous bootstrap check success
+    const recoveryScore = runtimeState.getSnapshot().system.uptime_seconds > 0 ? 100 : 0; // Read from runtimeState
     
     // 5. Execution Score
     const activeAudits = (data.agent24_audit_logs || []).length;
@@ -716,7 +725,7 @@ app.get('/api/intelligence-report', async (req, res) => {
     const profitabilityScore = Math.min(100, Math.round(avgProfitFactor * 50));
     
     // 7. Data Quality Score
-    const dataQualityScore = 98; // DB schema audit is clean
+    const dataQualityScore = db.isNeonOnline() ? 98 : 0; // Check DB connection
     
     // 8. Intelligence Score
     const dynamicThresholdResult = require('./dynamicThreshold').getCurrentThreshold();
@@ -800,18 +809,34 @@ app.post('/api/admin/reset', async (req, res) => {
 // Create HTTP server & WS server
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+// WebSocket heartbeat to clear dead connections
+const heartbeatInterval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) {
+      console.log('[WS]: Terminating dead connection.');
+      return ws.terminate();
+    }
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 30000);
+
+wss.on('close', () => {
+  clearInterval(heartbeatInterval);
+});
+
 
 wss.on('connection', (ws) => {
   console.log('[WS]: Dashboard client connected.');
+  ws.isAlive = true;
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
 
   // Immediate send current status
   sendUpdate(ws);
 
-  const interval = setInterval(() => {
-    if (ws.readyState === WebSocket.OPEN) {
-      sendUpdate(ws);
-    }
-  }, 1000);
+  // Interval removed. Broadcasts are pushed via tradingBot.broadcastDashboardUpdate()
 
   ws.on('message', (message) => {
     try {
@@ -832,7 +857,7 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
-    clearInterval(interval);
+    // Cleanup specific to this connection if any
     console.log('[WS]: Dashboard client disconnected.');
   });
 });
@@ -849,7 +874,6 @@ tradingBot.broadcastDashboardUpdate = async () => {
 
 async function sendUpdate(ws) {
   try {
-    const status = await tradingBot.getStatus();
     const recentAlertsList = alerts.getRecentAlerts();
     
     let symbolIntelligence = null;
@@ -861,13 +885,13 @@ async function sendUpdate(ws) {
       }
     }
     
+    const statusData = await tradingBot.getStatus();
+    // Inject recent alerts which is stored in server memory
+    statusData.recentAlerts = recentAlertsList;
+    
     ws.send(JSON.stringify({
       type: 'STATUS_UPDATE',
-      data: {
-        ...status,
-        recentAlerts: recentAlertsList,
-        runtime: runtimeState.getSnapshot()
-      },
+      data: statusData,
       symbolIntelligence
     }));
   } catch (err) {

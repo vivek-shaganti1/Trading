@@ -117,10 +117,10 @@ async function runPreMarketAudit() {
     const balance = Number(portfolio.balance || 0);
     const holdings = portfolio.holding_stocks || [];
     
-    if (balance !== 12000) {
-      // Force set portfolio state to 12,000 for paper trading session starting today
-      console.log(`[PRE-MARKET] Correcting portfolio balance from ₹${balance} to target ₹12,000...`);
-      portfolio.balance = 12000;
+    if (balance === undefined || balance === null || Number.isNaN(balance) || (balance === 0 && holdings.length === 0)) {
+      const targetCapital = config.INITIAL_CAPITAL || 12000;
+      console.log(`[PRE-MARKET] Initializing portfolio balance to target ₹${targetCapital}...`);
+      portfolio.balance = targetCapital;
       portfolio.equity_value = 0;
       portfolio.holding_stocks = [];
       await db.updatePortfolioState(portfolio);

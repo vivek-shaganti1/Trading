@@ -23,7 +23,7 @@ module.exports = {
   LIFETIME_CAPITAL_FLOOR: 8000, // 33% maximum drawdown of ₹12,000 capital
   DAILY_PROFIT_TARGET_START: 1000,
   DAILY_STOP_LOSS_PCT: 0.07, // Halts day trading if daily loss exceeds 7%
-  ADMIN_RESET_PASSWORD: process.env.ADMIN_PASSWORD || process.env.ADMIN_RESET_PASSWORD || 'admin123',
+  ADMIN_RESET_PASSWORD: process.env.ADMIN_PASSWORD || process.env.ADMIN_RESET_PASSWORD || null,
   EXPONENTIAL_GROWTH_FACTOR: 1.10, // 10% target growth once achieved
 
   // Strategy Timings (IST - Indian Standard Time)

@@ -1,4 +1,4 @@
-const providerHealth = require('./providerHealth');
+const runtimeState = require('./runtimeState');
 
 // Global Circuit Breaker State Map
 const circuitBreakers = {
@@ -46,16 +46,16 @@ async function withResilience(providerName, fetchFunction, maxRetries = 3, initi
       cb.state = 'CLOSED';
 
       // Update provider health (if tracked)
-      if (providerHealth.recordCall) {
-        providerHealth.recordCall(providerName, latency, true);
+      if (runtimeState.updateProviderHealth) {
+        runtimeState.updateProviderHealth(providerName, latency, true);
       }
       return result;
     } catch (err) {
       lastError = err;
       attempt++;
       
-      if (providerHealth.recordCall) {
-        providerHealth.recordCall(providerName, 0, false);
+      if (runtimeState.updateProviderHealth) {
+        runtimeState.updateProviderHealth(providerName, 0, false);
       }
 
       // Check if it's a 4xx error (do not retry on 400, 401, 403, 404 except 429)

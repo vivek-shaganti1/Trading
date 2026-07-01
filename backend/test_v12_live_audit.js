@@ -1,12 +1,13 @@
 const http = require('http');
+const https = require('https');
 
-const PORT = 10000;
-const HOST = 'localhost';
+const BASE_URL = process.env.API_URL || 'https://trading-s7ca.onrender.com';
 
 async function fetchAPI(endpoint) {
   return new Promise((resolve, reject) => {
     const start = Date.now();
-    const req = http.get(`http://${HOST}:${PORT}${endpoint}`, (res) => {
+    const client = BASE_URL.startsWith('https') ? https : http;
+    const req = client.get(`${BASE_URL}${endpoint}`, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {

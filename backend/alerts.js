@@ -1,6 +1,6 @@
 const config = require('../shared/config');
 const db = require('./db');
-const providerHealth = require('./providerHealth');
+const runtimeState = require('./runtimeState');
 
 // In-memory alert cache for dashboard UI polling/sockets
 const recentAlerts = [];
@@ -50,15 +50,15 @@ const alerts = {
       if (!response.ok) {
         const errText = await response.text();
         console.error('Telegram API error:', errText);
-        providerHealth.recordCall('Telegram', startTime, false, `Status ${response.status}`);
+        runtimeState.updateProviderHealth('Telegram', startTime, false, `Status ${response.status}`);
         try { await db.logAlert({ type: 'telegram', message, status: 'FAILED' }); } catch(e) {}
         return false;
       }
-      providerHealth.recordCall('Telegram', startTime, true, '200 OK');
+      runtimeState.updateProviderHealth('Telegram', startTime, true, '200 OK');
       try { await db.logAlert({ type: 'telegram', message, status: 'SENT' }); } catch(e) {}
       return true;
     } catch (err) {
-      providerHealth.recordCall('Telegram', startTime, false, err.message);
+      runtimeState.updateProviderHealth('Telegram', startTime, false, err.message);
       console.error('Telegram notification failed:', err);
       try { await db.logAlert({ type: 'telegram', message, status: 'FAILED' }); } catch(e) {}
       return false;

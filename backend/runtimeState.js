@@ -67,6 +67,15 @@ class RuntimeState {
         risk_exposure:       0.0
       },
 
+      // ── User Settings ─────────────────────────────────────────────────────
+      settings: {
+        risk_mode: 'NORMAL',
+        min_confidence_override: 0.75,
+        avoid_intraday: false,
+        avoid_longterm: false,
+        max_positions: 3
+      },
+
       // ── Scanner telemetry ────────────────────────────────────────────────
       scanner: {
         current_symbol:         'None',
@@ -119,10 +128,13 @@ class RuntimeState {
 
       // ── Provider health (real measured latencies) ─────────────────────────
       provider_health: {
-        gemini:  { latency_ms: null, success_rate: null, calls: 0, errors: 0, last_call: null },
-        groq:    { latency_ms: null, success_rate: null, calls: 0, errors: 0, last_call: null },
-        yahoo:   { latency_ms: null, success_rate: null, calls: 0, errors: 0, last_call: null },
-        zerodha: { latency_ms: null, success_rate: null, calls: 0, errors: 0, last_call: null }
+        Gemini:   { latency: null, successRate: null, errors: 0, lastResponse: 'Pending', lastUpdate: Date.now(), lastFailure: 'None', failureCount: 0, retryCount: 0 },
+        Groq:     { latency: null, successRate: null, errors: 0, lastResponse: 'Pending', lastUpdate: Date.now(), lastFailure: 'None', failureCount: 0, retryCount: 0 },
+        OpenAI:   { latency: null, successRate: null, errors: 0, lastResponse: 'Pending', lastUpdate: Date.now(), lastFailure: 'None', failureCount: 0, retryCount: 0 },
+        Yahoo:    { latency: null, successRate: null, errors: 0, lastResponse: 'Pending', lastUpdate: Date.now(), lastFailure: 'None', failureCount: 0, retryCount: 0 },
+        Kite:     { latency: null, successRate: null, errors: 0, lastResponse: 'Pending', lastUpdate: Date.now(), lastFailure: 'None', failureCount: 0, retryCount: 0 },
+        Telegram: { latency: null, successRate: null, errors: 0, lastResponse: 'Pending', lastUpdate: Date.now(), lastFailure: 'None', failureCount: 0, retryCount: 0 },
+        Postgres: { latency: null, successRate: null, errors: 0, lastResponse: 'Pending', lastUpdate: Date.now(), lastFailure: 'None', failureCount: 0, retryCount: 0 }
       },
 
       // ── Timeline & audit log ──────────────────────────────────────────────
@@ -142,12 +154,26 @@ class RuntimeState {
 
   // ── Read ──────────────────────────────────────────────────────────────────
 
+  updateMarketStatus(status) {
+    this.state.market.status = status;
+  }
+
+  updateSettings(settings) {
+    if (settings) {
+      Object.assign(this.state.settings, settings);
+    }
+  }
+
   getSnapshot() {
     this.state.market.clock          = new Date().toISOString();
     this.state.system.uptime_seconds = Math.floor(process.uptime());
     this.state.system.memory_usage   = process.memoryUsage();
     this.state.system.cpu_usage      = process.cpuUsage();
-    return { ...this.state };
+    try {
+      return structuredClone(this.state);
+    } catch (e) {
+      return JSON.parse(JSON.stringify(this.state));
+    }
   }
 
   // ── Write ─────────────────────────────────────────────────────────────────
@@ -206,20 +232,31 @@ class RuntimeState {
     Object.assign(this.state.performance, metrics);
   }
 
-  /**
-   * Record a real API provider call result.
-   * Uses exponential smoothing (alpha=0.2) for latency rolling average.
-   */
-  updateProviderHealth(provider, latencyMs, success) {
-    const p = this.state.provider_health[provider];
-    if (!p) return;
-    p.calls++;
-    if (!success) p.errors++;
-    p.last_call = new Date().toISOString();
-    p.latency_ms = p.latency_ms === null
-      ? latencyMs
-      : Math.round(p.latency_ms * 0.8 + latencyMs * 0.2);
-    p.success_rate = Math.round(((p.calls - p.errors) / p.calls) * 100);
+  updateProviderHealth(provider, start, success, responseMsg, retries = 0) {
+    const latency = Date.now() - start;
+    const stats = this.state.provider_health[provider];
+    if (stats) {
+      if (stats.latency === null) {
+        stats.latency = latency;
+      } else {
+        stats.latency = Math.round((stats.latency * 0.8) + (latency * 0.2));
+      }
+      
+      stats.lastUpdate = Date.now();
+      stats.retryCount = (stats.retryCount || 0) + retries;
+      
+      if (success) {
+        if (stats.successRate === null) stats.successRate = 100;
+        else stats.successRate = Math.round((stats.successRate * 0.95) + (100 * 0.05));
+      } else {
+        if (stats.successRate === null) stats.successRate = 0;
+        else stats.successRate = Math.round((stats.successRate * 0.95) + (0 * 0.05));
+        stats.errors = (stats.errors || 0) + 1;
+        stats.failureCount = (stats.failureCount || 0) + 1;
+        stats.lastFailure = new Date().toLocaleTimeString();
+      }
+      stats.lastResponse = responseMsg || (success ? '200 OK' : 'Error');
+    }
   }
 
   /**

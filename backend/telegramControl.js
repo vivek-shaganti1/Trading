@@ -123,12 +123,12 @@ Status: UNAUTHORIZED
       const snapshot = runtimeState.getSnapshot();
       const holdings = snapshot.positions || [];
       if (holdings.length === 0) {
-        response = `📋 <b>No pending or open simulated orders.</b>`;
+        response = `📋 <b>No pending or open orders.</b>`;
       } else {
-        let msg = `📋 <b>Open Simulated Positions</b>\n`;
+        let msg = `📋 <b>Open Positions</b>\n`;
         holdings.forEach((h, idx) => {
-          const ltp = broker.getLTP(h.symbol) || h.avgPrice;
-          const pnl = (ltp - h.avgPrice) * h.quantity;
+          const ltp = h.current_price || h.ltp || h.avgPrice;
+          const pnl = h.unrealized_pnl || ((ltp - h.avgPrice) * h.quantity);
           msg += `${idx + 1}. <b>${h.symbol}</b> | Qty: <b>${h.quantity}</b> | Entry: <b>₹${h.avgPrice}</b> | LTP: <b>₹${ltp}</b> | P&L: <b>₹${pnl.toFixed(2)}</b>\n`;
         });
         response = msg;
@@ -143,10 +143,10 @@ Status: UNAUTHORIZED
       } else {
         let msg = `💼 <b>Live Holdings</b>\n`;
         holdings.forEach((h, idx) => {
-          const ltp = broker.getLTP(h.symbol) || h.avgPrice;
-          const curVal = ltp * h.quantity;
+          const ltp = h.current_price || h.ltp || h.avgPrice;
+          const curVal = h.current_value || (ltp * h.quantity);
           const entryVal = h.avgPrice * h.quantity;
-          const pnl = curVal - entryVal;
+          const pnl = h.unrealized_pnl || (curVal - entryVal);
           msg += `${idx + 1}. <b>${h.symbol}</b> (${h.strategy})\n` +
                  `   • Qty: <b>${h.quantity}</b>\n` +
                  `   • Avg Entry: <b>₹${h.avgPrice}</b> | LTP: <b>₹${ltp}</b>\n` +
@@ -328,7 +328,7 @@ Status: UNAUTHORIZED
       const capitalUtil = (snapshot.financials.capital_utilization || 0).toFixed(1);
       response = `📊 <b>Institutional Profitability Audit</b>\n` +
                  `• Today Net PnL: <b>₹${dailyPnL.toFixed(2)}</b>\n` +
-                 `• Starting capital: <b>₹${(snapshot.financials.capital || 12000).toFixed(2)}</b>\n` +
+                 `• Starting capital: <b>₹${(snapshot.financials.capital || 0).toFixed(2)}</b>\n` +
                  `• Capital utilization: <b>${capitalUtil}%</b>\n` +
                  `• Opportunities audited: <b>${totalAudited.toLocaleString()}</b>\n` +
                  `• Losses prevented: <b>₹${lossesPrevented.toFixed(2)}</b>\n` +
@@ -337,11 +337,10 @@ Status: UNAUTHORIZED
     // /risk command
     else if (lowerText.startsWith('/risk')) {
       const snapshot = runtimeState.getSnapshot();
-      const portfolioState = await db.getPortfolioState();
-      const settings = portfolioState.user_instructions || {};
+      const settings = snapshot.settings;
       response = `🛡️ <b>Risk Parameters</b>\n` +
                  `• Daily Stop-Loss limit: <b>-7% (-₹${(snapshot.financials.total_value * 0.07).toFixed(2)})</b>\n` +
-                 `• Max capital floor drawdown: <b>₹8,000</b>\n` +
+                 `• Max capital floor drawdown: <b>₹${(snapshot.financials.lifetime_floor || 0).toLocaleString('en-IN')}</b>\n` +
                  `• Risk mode: <b>${settings.risk_mode || 'NORMAL'}</b>\n` +
                  `• Confidence floor: <b>${((settings.min_confidence_override || 0.75) * 100).toFixed(0)}%</b>\n` +
                  `• Avoid intraday: <b>${settings.avoid_intraday ? 'YES' : 'NO'}</b>\n` +
@@ -389,17 +388,16 @@ Status: UNAUTHORIZED
                  `• Open Positions Count: <b>${snapshot.positions.length}</b>\n` +
                  `• Pending Orders Count: <b>${snapshot.pending_orders.length}</b>`;
     }
-    // /performance command
     else if (lowerText.startsWith('/performance')) {
-      const data = db.readLocalDb();
-      const completed = data.completed_trades || [];
-      const wins = completed.filter(t => t.net_pnl > 0).length;
-      const winRate = completed.length > 0 ? (wins / completed.length * 100).toFixed(1) : '0.0';
-      const totalPnL = completed.reduce((sum, t) => sum + t.net_pnl, 0);
+      const snapshot = runtimeState.getSnapshot();
+      const totalTrades = snapshot.performance.lifetime_trades || 0;
+      const winRate = snapshot.performance.lifetime_win_rate !== null ? snapshot.performance.lifetime_win_rate.toFixed(1) : 'N/A';
+      const totalPnL = snapshot.financials.lifetime_pnl !== null ? snapshot.financials.lifetime_pnl.toFixed(2) : 'N/A';
+      
       response = `🏆 <b>Performance Analysis</b>\n` +
-                 `• Total Trades: <b>${completed.length}</b>\n` +
+                 `• Total Trades: <b>${totalTrades}</b>\n` +
                  `• Win Rate: <b>${winRate}%</b>\n` +
-                 `• Net P&L: <b>₹${totalPnL.toFixed(2)}</b>`;
+                 `• Net P&L: <b>₹${totalPnL}</b>`;
     }
     // /logs command
     else if (lowerText.startsWith('/logs')) {
@@ -553,7 +551,8 @@ Status: UNAUTHORIZED
       if (todayTrades.length === 0) {
         response = `📅 <b>Today's Trades:</b> No trades completed today yet.`;
       } else {
-        const todayPnL = todayTrades.reduce((sum, t) => sum + t.net_pnl, 0);
+        const snapshot = runtimeState.getSnapshot();
+        const todayPnL = snapshot.financials.daily_pnl || 0;
         response = `📅 <b>Today's Completed Trades</b>\n` +
                    todayTrades.map(t => `• ${t.symbol}: ₹${t.net_pnl.toFixed(2)} (${t.return_pct.toFixed(2)}%) - ${t.exit_reason}`).join('\n') +
                    `\n\n💰 <b>Today's Net P&L:</b> ₹${todayPnL.toFixed(2)}`;
@@ -562,8 +561,8 @@ Status: UNAUTHORIZED
     // NLP parameters update or other custom requests
     else {
       let updated = false;
-      const portfolioState = await db.getPortfolioState();
-      const settings = portfolioState.user_instructions || { risk_mode: 'NORMAL', min_confidence_override: 0.75, avoid_intraday: false, avoid_longterm: false, max_positions: 3 };
+      const snapshot = runtimeState.getSnapshot();
+      const settings = { ...snapshot.settings };
 
       if (lowerText.includes('focus on safer trades') || lowerText.includes('reduce risk')) {
         settings.risk_mode = 'SAFE';
@@ -581,6 +580,7 @@ Status: UNAUTHORIZED
       }
 
       if (updated) {
+        runtimeState.updateSettings(settings);
         await db.updatePortfolioState({
           user_instructions: settings
         });

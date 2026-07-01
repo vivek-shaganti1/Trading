@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
 const config = require('../shared/config');
-const providerHealth = require('./providerHealth');
+const runtimeState = require('./runtimeState');
 
 const DB_FILE = path.join(__dirname, '..', process.env.DB_FILE || 'db.json');
 
@@ -157,7 +157,9 @@ function initLocalDb() {
   if (!dbData.eod_report_state) { dbData.eod_report_state = []; modified = true; }
 
   if (modified) {
-    fs.writeFileSync(DB_FILE, JSON.stringify(dbData, null, 2));
+    const tmpFileInit = DB_FILE + '.tmp';
+    fs.writeFileSync(tmpFileInit, JSON.stringify(dbData, null, 2));
+    fs.renameSync(tmpFileInit, DB_FILE);
   }
 }
 
@@ -230,7 +232,9 @@ function readLocalDb() {
         completed_trades: [],
         eod_report_state: []
       };
-      fs.writeFileSync(DB_FILE, JSON.stringify(localDbCache, null, 2));
+      const tmpFileSync = DB_FILE + '.tmp';
+      fs.writeFileSync(tmpFileSync, JSON.stringify(localDbCache, null, 2));
+      fs.renameSync(tmpFileSync, DB_FILE);
     }
   }
   return localDbCache;
@@ -247,15 +251,29 @@ function writeLocalDb(data) {
     return;
   }
   isWriting = true;
-  // Non-blocking disk I/O
-  fs.writeFile(DB_FILE, JSON.stringify(data, null, 2), (err) => {
-    isWriting = false;
-    if (err) console.error('[DB ERROR] Failed to write db.json:', err.message);
-    if (pendingWrite) {
-      const nextData = pendingWrite;
-      pendingWrite = null;
-      writeLocalDb(nextData);
+  
+  // Non-blocking atomic disk I/O
+  const tmpFile = DB_FILE + '.tmp';
+  fs.writeFile(tmpFile, JSON.stringify(data, null, 2), (err) => {
+    if (err) {
+      console.error('[DB ERROR] Failed to write db.json.tmp:', err.message);
+      isWriting = false;
+      if (pendingWrite) {
+        const nextData = pendingWrite;
+        pendingWrite = null;
+        writeLocalDb(nextData);
+      }
+      return;
     }
+    fs.rename(tmpFile, DB_FILE, (renameErr) => {
+      isWriting = false;
+      if (renameErr) console.error('[DB ERROR] Failed to rename db.json.tmp:', renameErr.message);
+      if (pendingWrite) {
+        const nextData = pendingWrite;
+        pendingWrite = null;
+        writeLocalDb(nextData);
+      }
+    });
   });
 }
 
@@ -294,7 +312,7 @@ async function checkPostgresConnection() {
 }
 
 // Helper to run query with auto-fallback logging and retry
-async function runQuery(text, params = [], retryCount = 1) {
+async function runQuery(text, params = [], client = null, retryCount = 1) {
   if (config.USE_LOCAL_CACHE) return null;
   
   if (!dbAvailable) {
@@ -304,17 +322,17 @@ async function runQuery(text, params = [], retryCount = 1) {
   
   const startTime = Date.now();
   try {
-    const res = await pool.query(text, params);
-    providerHealth.recordCall('Postgres', startTime, true, 'OK');
+    const res = client ? await client.query(text, params) : await pool.query(text, params);
+    runtimeState.updateProviderHealth('Postgres', startTime, true, 'OK');
     return res.rows;
   } catch (err) {
-    providerHealth.recordCall('Postgres', startTime, false, err.message);
+    runtimeState.updateProviderHealth('Postgres', startTime, false, err.message);
     console.warn(`[DATABASE ERROR]: Query failed. Error: ${err.message}`);
     
     await checkPostgresConnection();
     if (retryCount > 0 && dbAvailable) {
       console.log(`[DATABASE RETRY]: Retrying query...`);
-      return runQuery(text, params, retryCount - 1);
+      return runQuery(text, params, client, retryCount - 1);
     }
     return null;
   }
@@ -854,6 +872,18 @@ async function syncLocalToPostgres() {
   }
 
   syncInProgress = true;
+  let client = null;
+  if (pool) {
+    try {
+      client = await pool.connect();
+      await client.query('BEGIN');
+    } catch (e) {
+      console.error('[DB SYNC] Failed to start transaction', e);
+      syncInProgress = false;
+      return;
+    }
+  }
+
   try {
     const data = readLocalDb();
 
@@ -1152,10 +1182,13 @@ async function syncLocalToPostgres() {
              item.tqs ? Number(item.tqs) : null, item.confidence ? Number(item.confidence) : null, item.execution_mode]
     }));
 
+    if (client) await client.query('COMMIT');
     writeLocalDb(data);
   } catch (err) {
-    console.error('[DB SYNC]: Sync loop failed:', err.message);
+    if (client) await client.query('ROLLBACK');
+    console.error('[DB SYNC]: Error during Neon sync:', err);
   } finally {
+    if (client) client.release();
     syncInProgress = false;
   }
 }
