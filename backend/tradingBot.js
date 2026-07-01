@@ -862,7 +862,7 @@ const tradingBot = {
     const marketDataDiagnostics = {
       dataProvider: marketData.getProviderName(),
       lastPriceTimestamp: debugData.lastApiResponseTimestamp || 'None',
-      lastApiResponseTime: runtimeState.state.provider_health.yahoo.latency_ms !== null ? `${runtimeState.state.provider_health.yahoo.latency_ms}ms` : 'N/A',
+      lastApiResponseTime: runtimeState.state.provider_health.Yahoo && runtimeState.state.provider_health.Yahoo.latency !== null ? `${runtimeState.state.provider_health.Yahoo.latency}ms` : 'N/A',
       marketStatus: debugData.marketStatus || 'CLOSED',
       sourceOfTruth: marketData.getMode(),
       mode: config.BROKER_MODE === 'LIVE' ? 'LIVE' : 'SIMULATOR'
