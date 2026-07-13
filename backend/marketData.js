@@ -151,6 +151,7 @@ const marketData = {
 
             const quotes = data?.chart?.result?.[0]?.indicators?.quote?.[0] || {};
             const closes = (quotes.close || []).filter(c => c !== null && c !== undefined);
+            const opens = (quotes.open || []).filter(o => o !== null && o !== undefined);
             const highs = (quotes.high || []).filter(h => h !== null && h !== undefined);
             const lows = (quotes.low || []).filter(l => l !== null && l !== undefined);
             const volumes = (quotes.volume || []).filter(v => v !== null && v !== undefined);
@@ -159,7 +160,7 @@ const marketData = {
               throw new Error(`Insufficient live historical points for interval ${interval} (need >= 26)`);
             }
 
-            const formattedResult = { closes, highs, lows, volumes, source: 'LIVE' };
+            const formattedResult = { closes, opens, highs, lows, volumes, source: 'LIVE' };
             // Cache the result
             responseCache[cacheKey] = { timestamp: Date.now(), data: formattedResult };
             return formattedResult;

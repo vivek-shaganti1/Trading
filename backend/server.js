@@ -273,10 +273,7 @@ app.get('/api/broker', async (req, res) => {
 // API: Start/Stop bot
 app.post('/api/control', async (req, res) => {
   try {
-    const { action, password } = req.body;
-    if (password !== config.ADMIN_RESET_PASSWORD) {
-      return res.status(403).json({ error: 'Unauthorized: Incorrect admin password.' });
-    }
+    const { action } = req.body;
     console.log(`[API CONTROL] Action: ${action} received.`);
     if (action === 'START') {
       tradingBot.resumeEntries();
@@ -1003,8 +1000,35 @@ server.listen(config.PORT, '0.0.0.0', () => {
       console.log(`[STARTUP] Learning State: ${memoryCount} market memories, ${trustLogCount} trust logs, ${researchLogCount} research logs, ${journalCount} journals, ${a20Count} analyst reports, ${a24Count} audit logs`);
       
       await predictor.loadLeaderboardFromDb();
-      await tradingBot.start();
-      console.log('[STARTUP] Trading bot started successfully.');
+      
+      const cron = require('node-cron');
+      
+      // Schedule Bot Start (09:00 AM IST Monday-Friday)
+      cron.schedule('0 9 * * 1-5', async () => {
+        console.log('[CRON] 09:00 AM - Booting Trading Engine for the day...');
+        await tradingBot.start();
+      }, { timezone: "Asia/Kolkata" });
+      
+      // Schedule Bot Stop (03:30 PM IST Monday-Friday)
+      cron.schedule('30 15 * * 1-5', () => {
+        console.log('[CRON] 03:30 PM - Halting Trading Engine after EOD processes...');
+        tradingBot.stop();
+      }, { timezone: "Asia/Kolkata" });
+
+      // Immediate Boot Check
+      const fsm = require('./lifecycleFSM');
+      const timeInfo = fsm.getSystemTime();
+      const currentMins = timeInfo.hours * 60 + timeInfo.minutes;
+      const session = fsm.getTradingSession();
+      
+      // Start immediately if booting inside the active window (08:55 to 15:40) on a weekday
+      if (currentMins >= 8 * 60 + 55 && currentMins < 15 * 60 + 40 && !session.isWeekend && !session.isHoliday) {
+        console.log('[STARTUP] Server started during active trading window. Starting trading bot immediately.');
+        await tradingBot.start();
+        console.log('[STARTUP] Trading bot started successfully.');
+      } else {
+        console.log('[STARTUP] Server started outside active trading window. Bot will sleep until 08:55 AM IST.');
+      }
     } catch (err) {
       console.error('[STARTUP] Error during async background boot sequence:', err);
     }

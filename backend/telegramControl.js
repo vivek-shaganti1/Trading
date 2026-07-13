@@ -72,17 +72,24 @@ Status: UNAUTHORIZED
   try {
     const safeCommands = ['/status', '/help', '/start', '/stop', '/stopbot', '/settings'];
     const isSafeCommand = safeCommands.some(cmd => lowerText.startsWith(cmd));
-    const isMarketOpen = runtimeState.getSnapshot().market.isOpen;
+    const fsm = require('./lifecycleFSM');
+    const fsmSession = fsm.getTradingSession();
+    const isMarketOpen = fsmSession.isOpen;
 
     if (!isMarketOpen && !isSafeCommand) {
-      return `🔴 <b>Market CLOSED.</b> Command ignored. Only safe diagnostic commands are permitted outside NSE trading hours.`;
+      return `🔴 <b>Market CLOSED.</b> Command ignored. Only safe diagnostic commands are permitted outside NSE trading hours.\nReason: ${fsmSession.blockReason}`;
     }
 
     // /start command
     if (lowerText.startsWith('/start')) {
       tradingBot.resumeEntries(); // Enable entries
       await tradingBot.start();   // Start scanning loop
-      response = `🚀 <b>Trading session started!</b> Automated scan and tick loops are active.`;
+      const fsmSession = fsm.getTradingSession();
+      if (fsmSession.session === 'TRADING' || fsmSession.session === 'MARKET_OPEN' || fsmSession.session === 'SCANNING') {
+        response = `🚀 <b>Trading session is ACTIVE!</b> Automated scan and tick loops are running.\nScanner Status: READY`;
+      } else {
+        response = `🚀 <b>Trading session started!</b> Automated scan and tick loops are active.`;
+      }
     }
     // /stopbot or /stop command
     else if (lowerText.startsWith('/stopbot') || lowerText.startsWith('/stop')) {
@@ -103,23 +110,23 @@ Status: UNAUTHORIZED
     }
     // /status command
     else if (lowerText.startsWith('/status')) {
-      const snapshot = runtimeState.getSnapshot();
-      const dailyPnL = snapshot.financials.realized_pnl || 0;
-      const dailyTarget = snapshot.financials.daily_target || 1000;
-      const marketStatus = snapshot.market.isOpen ? 'OPEN 🟢' : 'CLOSED 🔴';
-      const runningStatus = snapshot.isRunning ? 'RUNNING 🟢' : 'PAUSED ⏸';
-      const lastScanTime = snapshot.scanner.last_scan_timestamp
-        ? new Date(snapshot.scanner.last_scan_timestamp).toLocaleTimeString()
+      const status = await tradingBot.getStatus();
+      const dailyPnL = status.daily_stats ? status.daily_stats.net_pnl : 0;
+      const dailyTarget = status.daily_stats ? status.daily_stats.daily_target : 1000;
+      const marketStatus = status.engine_state.market_open ? 'OPEN 🟢' : 'CLOSED 🔴';
+      const runningStatus = status.engine_state.running ? 'RUNNING 🟢' : 'PAUSED ⏸';
+      const lastScanTime = status.pipeline_state.lastScanTime
+        ? new Date(status.pipeline_state.lastScanTime).toLocaleTimeString()
         : 'None';
-      const currentSymbol = snapshot.scanner.current_symbol || 'None';
-      const scannerHealth = snapshot.scanner.scanner_health || 'PAUSED';
+      const currentSymbol = status.pipeline_state.currentSymbol || 'None';
+      const scannerHealth = status.pipeline_state.activeCandidates > 0 ? 'ACTIVE' : 'IDLE';
 
       response = `🤖 <b>Quant Command Station Status</b>\n` +
                  `• Engine Status: <b>${runningStatus}</b>\n` +
                  `• Market Status: <b>${marketStatus}</b>\n` +
-                 `• Capital: <b>₹${snapshot.financials.total_value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
-                 `• Cash: <b>₹${snapshot.financials.cash.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
-                 `• Open Positions: <b>${(snapshot.positions || []).length}</b>\n` +
+                 `• Capital: <b>₹${status.valuation.totalVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
+                 `• Cash: <b>₹${status.valuation.cash.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
+                 `• Open Positions: <b>${(status.portfolio.holding_stocks || []).length}</b>\n` +
                  `• Today's P&L: <b>₹${dailyPnL.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
                  `• Daily Target: <b>₹${dailyTarget.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</b>\n` +
                  `• Last Scan: <b>${lastScanTime}</b>\n` +

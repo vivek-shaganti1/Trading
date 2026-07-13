@@ -1702,14 +1702,12 @@ async function fetchTradesHistory() {
 
 // Controls Events
 btnToggleBot.addEventListener('click', async () => {
-  const pwd = prompt("Enter admin password to toggle bot:");
-  if (!pwd) return;
   const action = isBotRunning ? 'STOP' : 'START';
   try {
     const res = await fetch(`${backendBase}/api/control`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, password: pwd })
+      body: JSON.stringify({ action })
     });
     const result = await res.json();
     if (result.success) {

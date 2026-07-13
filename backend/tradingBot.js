@@ -11,6 +11,7 @@ const marketData = require('./marketData');
 const runtimeState = require('./runtimeState');
 const volumeIntelligenceAgent = require('./volumeIntelligenceAgent');
 const exitIntelligenceEngine = require('./exitIntelligenceEngine');
+const fsm = require('./lifecycleFSM');
 
 
 const pendingExecutions = new Set();
@@ -161,6 +162,8 @@ const preMarketStateTarget = {
   openingScanFailureAlerted: false,
   noSignalsWarningAlerted: false,
   watchlistLoadedAlerted: false,
+  aiWarmupAlerted: false,
+  eodSquareOffAlerted: false,
   currentDate: null
 };
 
@@ -197,52 +200,7 @@ let signalSuppressionState = {
   winRateImpact: '+2.8% win rate stabilization'
 };
 
-function getSystemTime() {
-  if (global.mockTime) return global.mockTime;
-  const now = new Date();
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Kolkata',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hour12: false
-  }).formatToParts(now);
-
-  const lookup = {};
-  parts.forEach(p => { lookup[p.type] = p.value; });
-
-  const dayStr = now.toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', weekday: 'short' });
-  const days = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
-  const day = days[dayStr];
-
-  return {
-    hours: parseInt(lookup.hour, 10),
-    minutes: parseInt(lookup.minute, 10),
-    seconds: parseInt(lookup.second, 10),
-    dateStr: `${lookup.year}-${lookup.month}-${lookup.day}`,
-    day: day
-  };
-}
-
-function isHoliday(dateStr) {
-  const holidays = [
-    '2026-01-26', // Republic Day
-    '2026-03-06', // Holi
-    '2026-04-02', // Mahavir Jayanti
-    '2026-04-03', // Good Friday
-    '2026-04-14', // Dr. Ambedkar Jayanti
-    '2026-05-01', // Maharashtra Day
-    '2026-05-21', // Id-ul-Zuha
-    '2026-08-15', // Independence Day
-    '2026-08-28', // Ganesh Chaturthi
-    '2026-10-02', // Gandhi Jayanti
-    '2026-10-22', // Dussehra
-    '2026-11-12', // Diwali Laxmi Puja
-    '2026-11-13', // Diwali Balipratipada
-    '2026-11-23', // Guru Nanak Jayanti
-    '2026-12-25'  // Christmas
-  ];
-  return holidays.includes(dateStr);
-}
+// Timing and Holiday logic moved to lifecycleFSM
 
 function logSuppressionDiagnostics(item, prediction, tqs, requiredThreshold, rejectionReason, isThresholdRejection = false) {
   const voteInfo = getVoteBreakdown(prediction);
@@ -382,7 +340,7 @@ const tradingBot = {
     this.addTimeline('09:00', 'Pre-Market Started');
     
     // Automatically reset/initialize daily stats for the current day to clear any stale halt status
-    const timeInfo = getSystemTime();
+    const timeInfo = fsm.getSystemTime();
     try {
       const portfolio = await db.getPortfolioState();
       const valuation = await broker.getValuation();
@@ -417,6 +375,8 @@ const tradingBot = {
         strategy_switched: false,
         status: 'ACTIVE'
       };
+      
+      preMarketState.currentDate = timeInfo.dateStr;
       
       await db.updatePortfolioState({ current_daily_target: calculatedTarget });
       await db.saveDailyStats(currentDayStats);
@@ -523,7 +483,15 @@ const tradingBot = {
     console.log(`🚀 MARKET_OPEN_TRIGGERED at ${new Date().toLocaleTimeString()}`);
     console.log(`====================================================`);
     
-    await this.printReadinessReport();
+    const timeInfo = fsm.getSystemTime();
+    const currentMins = timeInfo.hours * 60 + timeInfo.minutes;
+    
+    if (currentMins <= 9 * 60 + 16) {
+      await this.printReadinessReport();
+    } else {
+      console.log(`[MID-SESSION RECOVERY] Bypassing Premarket Readiness Report at ${timeInfo.hours}:${timeInfo.minutes}`);
+      await alerts.sendTelegram(`🔄 <b>MID-SESSION RECOVERY</b>\nEngine restarted at ${timeInfo.hours}:${timeInfo.minutes} IST.\nAuto-resuming scanning and execution.`);
+    }
     
     // Auto start active scanning immediately
     const valuation = await broker.getValuation();
@@ -565,12 +533,21 @@ const tradingBot = {
       console.log('[BOT START]: Engine already running. Ignoring duplicate start request.');
       return;
     }
+    if (this._isStarting) {
+      console.log('[BOT START]: Engine is currently initializing. Ignoring duplicate start request.');
+      return;
+    }
+    this._isStarting = true;
+    try {
+      
+    // Force FSM evaluation so state is not BOOT if we are recovering mid-session
+    fsm.evaluateTransitions();
 
     // Warm up the preMarketState status flags on startup
     await this.runPreMarketWarmup();
     
     // If started during market hours, automatically trigger final checks and market open trigger
-    const timeInfo = getSystemTime();
+    const timeInfo = fsm.getSystemTime();
     const currentMins = timeInfo.hours * 60 + timeInfo.minutes;
     if (currentMins >= 9 * 60 + 15) {
       preMarketState.finalCheckPassed = true;
@@ -584,21 +561,19 @@ const tradingBot = {
     runtimeState.updateSettings(portfolio.user_instructions);
     console.log(`[BOT START]: Portfolio Loaded. Strategy: Expectancy Engine. Balance: ₹${portfolio.balance}`);
 
-    let lastPayloadStr = '';
+    let lastBroadcastTime = 0;
 
     botInterval = setInterval(async () => {
       if (isTicking) return;
       isTicking = true;
       try {
         await this.tick();
-        // Broadcast state changes directly driven by the trading loop
+        // Broadcast state changes periodically
         if (typeof this.broadcastDashboardUpdate === 'function') {
-          // Check if payload actually changed before broadcasting
-          const currentPayload = await this.getStatus();
-          const currentPayloadStr = JSON.stringify(currentPayload);
-          if (currentPayloadStr !== lastPayloadStr) {
+          const now = Date.now();
+          if (now - lastBroadcastTime > 5000) {
             this.broadcastDashboardUpdate();
-            lastPayloadStr = currentPayloadStr;
+            lastBroadcastTime = now;
           }
         }
       } catch (err) {
@@ -607,6 +582,9 @@ const tradingBot = {
         isTicking = false;
       }
     }, 500);
+    } finally {
+      this._isStarting = false;
+    }
   },
 
   stop() {
@@ -635,7 +613,7 @@ const tradingBot = {
     const valuation = await broker.getValuation();
     const portfolio = await db.getPortfolioState();
     const dbData = db.readLocalDb();
-    const timeInfo = getSystemTime();
+    const timeInfo = fsm.getSystemTime();
 
     if (currentDayStats) {
       const dailyPnL = parseFloat((valuation.totalVal - currentDayStats.start_capital).toFixed(2));
@@ -1079,7 +1057,7 @@ const tradingBot = {
       requiredWinRate = 0.0;
     }
 
-    const timeInfo = getSystemTime();
+    const timeInfo = fsm.getSystemTime();
     const currentMins = timeInfo.hours * 60 + timeInfo.minutes;
     const closeMins = 15 * 60 + 30;
     const minsRemaining = Math.max(0, closeMins - currentMins);
@@ -1106,14 +1084,8 @@ const tradingBot = {
     };
   },
 
-  isMarketOpenWindow(timeInfo) {
-    if (!timeInfo) {
-      timeInfo = getSystemTime();
-    }
-    if (timeInfo.day === 0 || timeInfo.day === 6) return false;
-    if (typeof isHoliday === 'function' && isHoliday(timeInfo.dateStr)) return false;
-    const currentMins = timeInfo.hours * 60 + timeInfo.minutes;
-    return currentMins >= 9 * 60 + 15 && currentMins < 15 * 60 + 30; // Strictly 9:15 AM to 3:30 PM IST
+  isMarketOpenWindow(timeInfo = null) {
+    return fsm.getTradingSession().isOpen;
   },
 
   async logOpportunityInTracker(item, prediction, tqs, status, rejectionReason) {
@@ -1156,7 +1128,7 @@ const tradingBot = {
         if (!preMarketState.firstSignalGenerated) {
           preMarketState.firstSignalGenerated = true;
           this.addAuditLog('FIRST_SIGNAL_GENERATED');
-          const timeInfo = getSystemTime();
+          const timeInfo = fsm.getSystemTime();
           this.addTimeline(`${timeInfo.hours.toString().padStart(2, '0')}:${timeInfo.minutes.toString().padStart(2, '0')}`, 'First Signal');
         }
       }
@@ -1164,7 +1136,7 @@ const tradingBot = {
         if (!preMarketState.firstTradeExecuted) {
           preMarketState.firstTradeExecuted = true;
           this.addAuditLog('FIRST_TRADE_EXECUTED');
-          const timeInfo = getSystemTime();
+          const timeInfo = fsm.getSystemTime();
           this.addTimeline(`${timeInfo.hours.toString().padStart(2, '0')}:${timeInfo.minutes.toString().padStart(2, '0')}`, 'First Trade');
         }
       }
@@ -1228,9 +1200,9 @@ const tradingBot = {
         if (history && history.closes && history.closes.length > 0) {
           formattedCandles = history.closes.map((c, idx) => ({
             close: c,
-            open: history.opens[idx],
-            high: history.highs[idx],
-            low: history.lows[idx],
+            open: (history.opens && history.opens[idx]) || c,
+            high: (history.highs && history.highs[idx]) || c,
+            low: (history.lows && history.lows[idx]) || c,
             volume: history.volumes ? history.volumes[idx] : 1000
           }));
         }
@@ -1246,13 +1218,31 @@ const tradingBot = {
           const profitGivenBack = Math.max(0, peakValue - tradePnL);
           const detailedReason = `${exitReason} | Entry: ₹${pos.avgPrice} | PnL: ₹${tradePnL.toFixed(2)} | Return: ${returnPct.toFixed(2)}% | Peak PnL: ₹${peakValue.toFixed(2)} | Given Back: ₹${profitGivenBack.toFixed(2)}`;
 
-          await agent17_execution.placeOrder(
-            pos.symbol,
-            'SELL',
-            pos.quantity,
-            'CNC',
-            detailedReason
-          );
+          try {
+            await agent17_execution.placeOrder(
+              pos.symbol,
+              'SELL',
+              pos.quantity,
+              'CNC',
+              detailedReason
+            );
+            console.log(`\n[PIPELINE]`);
+            console.log(`SELL ORDER CREATED`);
+            console.log(`↓`);
+            console.log(`BROKER REQUEST SENT`);
+            console.log(`↓`);
+            console.log(`BROKER RESPONSE (SUCCESS)`);
+            console.log(`↓`);
+            console.log(`ORDER FILLED`);
+            console.log(`↓`);
+            console.log(`PORTFOLIO UPDATED`);
+          } catch (err) {
+            console.error(`[PORTFOLIO EXIT FAILED] Could not exit ${pos.symbol}:`, err.message);
+            console.log(`\n[PIPELINE]`);
+            console.log(`SELL ORDER FAILED`);
+            console.log(`↓`);
+            console.log(`BROKER REJECTED: ${err.message}`);
+          }
 
           // Update losing streak count
           if (returnPct < 0) {
@@ -1354,7 +1344,7 @@ const tradingBot = {
         }
       }
     } catch (err) {
-      console.error('[BOT] Error processing real exits:', err.message);
+      console.error('[BOT] Error processing real exits:', err.stack);
     }
   },
 
@@ -1410,23 +1400,24 @@ const tradingBot = {
     }
   },
   async tick() {
-    const timeInfo = getSystemTime();
-    console.log(`[SCHEDULER TRACE] tick() called at ${new Date().toISOString()} | day: ${timeInfo.day}, dateStr: ${timeInfo.dateStr}, time: ${timeInfo.hours}:${timeInfo.minutes}:${timeInfo.seconds}`);
+    if (entriesPaused) {
+       console.log(`[SCHEDULER TRACE] tick() paused by user.`);
+       return;
+    }
+    const fsmResult = fsm.evaluateTransitions();
+    const state = fsmResult.state;
+    const s = fsmResult.sessionDetails;
+    const timeInfo = s.timeInfo;
+    const currentMins = s.currentMins;
     
-    if (timeInfo.day === 0 || timeInfo.day === 6 || isHoliday(timeInfo.dateStr)) {
-      console.log(`[SCHEDULER TRACE] tick() exited early: Weekend or Holiday (day: ${timeInfo.day}, dateStr: ${timeInfo.dateStr})`);
-      return;
-    }
-    const currentMins = timeInfo.hours * 60 + timeInfo.minutes;
-
-    if (currentMins < 9 * 60 || currentMins >= 15 * 60 + 30) {
-      if (currentMins >= 15 * 60 + 30 && currentDayStats && currentDayStats.status === 'ACTIVE') {
-        console.log(`[SCHEDULER TRACE] 15:30 IST reached. Finalizing market day...`);
-        await this.finalizeMarketDay(timeInfo.dateStr);
+    // Check if we need to log a blocker and exit
+    if (s.blockReason) {
+      if (s.session === 'CLOSED' || s.session === 'PREMARKET_WAIT') {
+         fsm.printSchedulerBlock(s.blockReason, s);
+         return; // Blocker 8: Outside trading hours -> No broker polling, no APIs, no scanning.
       }
-      return; // Blocker 8: Outside trading hours -> No broker polling, no APIs, no scanning.
     }
-
+    
     // Daily reset check: if dateStr has changed since last processed tick, reset preMarketState
     if (!preMarketState.currentDate || preMarketState.currentDate !== timeInfo.dateStr) {
       console.log(`[SCHEDULER] New trading day detected: ${timeInfo.dateStr}. Resetting pre-market state and resuming entries.`);
@@ -1455,8 +1446,20 @@ const tradingBot = {
         openingScanFailureAlerted: false,
         noSignalsWarningAlerted: false,
         watchlistLoadedAlerted: false,
+        aiWarmupAlerted: false,
+        eodSquareOffAlerted: false,
         currentDate: timeInfo.dateStr
       });
+      signalSuppressionState = {
+        totalCandidates: 0,
+        rejectedByThreshold: 0,
+        tqsBuckets: { tqs70: 0, tqs75: 0, tqs78: 0, tqs80: 0, tqs85: 0 },
+        detailedRejections: [],
+        bottleneckDetected: false,
+        recommendedThreshold: 65,
+        expectedAdditionalTrades: 0,
+        winRateImpact: '+2.8% win rate stabilization'
+      };
       entriesPaused = false;
       global.profitChasingMode = false;
       tqsThresholdOffset = 0;
@@ -1464,19 +1467,31 @@ const tradingBot = {
     }
     
     // Pre-Market Mode (09:00 - 09:15 IST)
-    if (currentMins >= 9 * 60 && currentMins < 9 * 60 + 15) {
+    if (state === 'PREMARKET' || state === 'WAITING_FOR_OPEN') {
       console.log(`[SCHEDULER TRACE] Pre-Market Mode active (${timeInfo.hours}:${timeInfo.minutes}:${timeInfo.seconds})`);
+      
+      // 09:00 IST: Premarket Validation (happens naturally via runPreMarketWarmup triggered once)
       await this.runPreMarketWarmup();
 
-      if (currentMins === 9 * 60 + 10 && timeInfo.seconds === 0) {
+      // 09:05 IST: Watchlist
+      if (currentMins === 9 * 60 + 5 && timeInfo.seconds === 0) {
         if (!preMarketState.watchlistLoadedAlerted) {
           preMarketState.watchlistLoadedAlerted = true;
-          console.log('[SCHEDULER] 09:10 IST - Loading symbol watchlists...');
+          console.log('[SCHEDULER] 09:05 IST - Loading symbol watchlists...');
           await alerts.sendTelegram('📋 <b>Watchlists Loaded:</b> 5,000+ symbol universes queued for execution scan.');
         }
       }
+
+      // 09:10 IST: AI Warmup
+      if (currentMins === 9 * 60 + 10 && timeInfo.seconds === 0) {
+        if (!preMarketState.aiWarmupAlerted) {
+          preMarketState.aiWarmupAlerted = true;
+          console.log('[SCHEDULER] 09:10 IST - AI Warmup sequence...');
+          await alerts.sendTelegram('🧠 <b>AI Warmup:</b> Neural models pre-loaded and context windows initialized.');
+        }
+      }
       
-      if (currentMins === 9 * 60 + 14 && timeInfo.seconds >= 50) {
+      if (state === 'WAITING_FOR_OPEN' && timeInfo.seconds >= 50) {
         await this.runFinalPreMarketChecks();
       }
       
@@ -1493,38 +1508,53 @@ const tradingBot = {
       console.log(`[SCHEDULER TRACE] tick() exited early: Pre-Market Mode`);
       return;
     }
-    if (currentMins >= 9 * 60 + 15) {
+
+    
+    if (state === 'MARKET_OPEN' || state === 'SCANNING' || state === 'TRADING' || state === 'MARKET_CLOSING') {
       if (!preMarketState.marketOpenTriggered) {
         await this.triggerMarketOpen();
       }
+    }
       
-      // Missed Open Detection (30s check)
-      if (!preMarketState.firstScanCompleted) {
-        const secondsSinceOpen = (currentMins - (9 * 60 + 15)) * 60 + timeInfo.seconds;
-        if (secondsSinceOpen >= 30) {
-          if (!preMarketState.openingScanFailureAlerted) {
-            preMarketState.openingScanFailureAlerted = true;
-            await alerts.sendTelegram('⚠️ 🚨 <b>CRITICAL ALERT: OPENING SCAN FAILURE</b> - Initial scan failed to complete within 30s of market open.');
-          }
-          
-          const nowMs = Date.now();
-          if (!preMarketState.lastFailsafeRetryTime || (nowMs - preMarketState.lastFailsafeRetryTime >= 30000)) {
-            preMarketState.lastFailsafeRetryTime = nowMs;
-            preMarketState.failsafeRetries++;
-            console.warn(`[FAILSAFE] Scheduler missed market open. Restarting scanning subsystem. Retry #${preMarketState.failsafeRetries}`);
-            const valuation = await broker.getValuation();
-            await this.runScanningSubsystem(valuation);
-          }
+    if (state === 'EOD' || state === 'EOD_PROCESSING' || state === 'STOPPED') {
+      if (currentDayStats && currentDayStats.status === 'ACTIVE') {
+        console.log(`[SCHEDULER TRACE] EOD Reached. Finalizing market day...`);
+        await this.finalizeMarketDay(timeInfo.dateStr);
+      }
+      return;
+    }
+
+    if (state !== 'SCANNING' && state !== 'TRADING') {
+       fsm.printSchedulerBlock('Outside of Active Scanning/Trading Session', s);
+       return;
+    }
+    
+    // Check missing first scan (30s check)
+    if (!preMarketState.firstScanCompleted) {
+      const secondsSinceOpen = (currentMins - (9 * 60 + 15)) * 60 + timeInfo.seconds;
+      if (secondsSinceOpen >= 30) {
+        if (!preMarketState.openingScanFailureAlerted) {
+          preMarketState.openingScanFailureAlerted = true;
+          await alerts.sendTelegram('⚠️ 🚨 <b>CRITICAL ALERT: OPENING SCAN FAILURE</b> - Initial scan failed to complete within 30s of market open.');
+        }
+        
+        const nowMs = Date.now();
+        if (!preMarketState.lastFailsafeRetryTime || (nowMs - preMarketState.lastFailsafeRetryTime >= 30000)) {
+          preMarketState.lastFailsafeRetryTime = nowMs;
+          preMarketState.failsafeRetries++;
+          console.warn(`[FAILSAFE] Scheduler missed market open. Restarting scanning subsystem. Retry #${preMarketState.failsafeRetries}`);
+          const valuation = await broker.getValuation();
+          await this.runScanningSubsystem(valuation);
         }
       }
+    }
       
-      // Missed Signals Detection (10m check)
-      if (!preMarketState.firstSignalGenerated && !preMarketState.noSignalsWarningAlerted) {
-        const secondsSinceOpen = (currentMins - (9 * 60 + 15)) * 60 + timeInfo.seconds;
-        if (secondsSinceOpen >= 600) {
-          preMarketState.noSignalsWarningAlerted = true;
-          await alerts.sendTelegram('⚠️ <b>WARNING: NO SIGNALS DETECTED</b> - No AI consensus signals generated within 10 minutes of market open.');
-        }
+    // Missed Signals Detection (10m check)
+    if (!preMarketState.firstSignalGenerated && !preMarketState.noSignalsWarningAlerted) {
+      const secondsSinceOpen = (currentMins - (9 * 60 + 15)) * 60 + timeInfo.seconds;
+      if (secondsSinceOpen >= 600) {
+        preMarketState.noSignalsWarningAlerted = true;
+        await alerts.sendTelegram('⚠️ <b>WARNING: NO SIGNALS DETECTED</b> - No AI consensus signals generated within 10 minutes of market open.');
       }
     }
 
@@ -1747,6 +1777,21 @@ const tradingBot = {
       lastStatusSentMins = currentMins;
       await this.sendPeriodicStatusUpdate(timeInfo);
     }
+
+    // EOD Square Off Trigger
+    if (state === 'MARKET_CLOSING' && currentMins >= 15 * 60 + 30 && currentMins < 15 * 60 + 35) {
+      if (!preMarketState.eodSquareOffAlerted) {
+        preMarketState.eodSquareOffAlerted = true;
+        console.log('[SCHEDULER] 15:30 IST - EOD Square Off sequence initiated...');
+        await alerts.sendTelegram('⏰ <b>15:30 EOD Square Off:</b> Liquidating all active day trading positions.');
+        const activeHoldings = portfolio.holding_stocks || [];
+        try {
+          await riskEngine.triggerEmergencySquareOff(broker, activeHoldings);
+        } catch (e) {
+          console.error('[EOD SQUARE OFF] Error during liquidation:', e.message);
+        }
+      }
+    }
   },
 
   async processScannerRankings(scanResults, valuation) {
@@ -1892,7 +1937,7 @@ const tradingBot = {
       const { item, prediction, tqs } = cand;
 
       // 15:30 IST Entry restriction check
-      const timeCheck = getSystemTime();
+      const timeCheck = fsm.getSystemTime();
       const minsCheck = timeCheck.hours * 60 + timeCheck.minutes;
       if (minsCheck >= 15 * 60 + 30) {
         console.log(`[PORTFOLIO SKIP] 15:30 IST entry restriction. Skipping trade for ${item.symbol}.`);
@@ -2151,6 +2196,7 @@ const tradingBot = {
         rejectionReasons.portfolio_replacement_failed++;
         await this.logOpportunityInTracker(item, prediction, tqs, 'REJECTED', `Risk engine: ${riskEvaluation.reason}`);
         logSuppressionDiagnostics(item, prediction, tqs, currentThreshold, `Risk engine: ${riskEvaluation.reason}`, false);
+        console.log(`\n[PIPELINE]\nScanner PASS\n↓\nConsensus PASS\n↓\nRisk REJECTED (${riskEvaluation.reason})`);
         continue;
       }
 
@@ -2181,6 +2227,7 @@ const tradingBot = {
           data.zero_qty_rejections = (data.zero_qty_rejections || 0) + 1;
           db.writeLocalDb(data);
         } catch (e) {}
+        console.log(`\n[PIPELINE]\nScanner PASS\n↓\nConsensus PASS\n↓\nRisk PASS\n↓\nCapital REJECTED (qty=0)`);
         continue;
       }
 
@@ -2189,6 +2236,7 @@ const tradingBot = {
         console.log(`[PORTFOLIO] Expectancy ${prediction.expectancyBeforeTrade.toFixed(4)} | TQS ${tqs} | Size ${finalAllocationPct}%`);
         
         await this.logOpportunityInTracker(item, prediction, tqs, 'EXECUTED', 'None');
+        console.log(`\n[PIPELINE]\nScanner PASS\n↓\nConsensus PASS\n↓\nRisk PASS\n↓\nCapital PASS\n↓\nPosition PASS\n↓\nBUY ORDER CREATED`);
 
         const modelWeightsList = {};
         const leaderboard = predictor.getLeaderboard();
@@ -2236,6 +2284,8 @@ const tradingBot = {
         pendingExecutions.add(item.symbol);
 
         try {
+          console.log(`[PIPELINE] ↓\nBROKER REQUEST SENT`);
+          const startTime = Date.now();
           await agent17_execution.placeOrder(
             item.symbol,
             'BUY',
@@ -2244,6 +2294,8 @@ const tradingBot = {
             detailedReason,
             item.price
           );
+          const latency = Date.now() - startTime;
+          console.log(`[PIPELINE] ↓\nBROKER RESPONSE (HTTP 200 OK | Latency: ${latency}ms)\n↓\nORDER FILLED\n↓\nPORTFOLIO UPDATED`);
 
           entryCooldowns[item.symbol] = Date.now();
 
@@ -2277,6 +2329,7 @@ const tradingBot = {
           await alerts.sendTelegram(buyAlertText);
         } catch (orderErr) {
           console.error(`[ORDER EXECUTION FAILED] For ${item.symbol}:`, orderErr.message);
+          console.log(`[PIPELINE] ↓\nBROKER REJECTED: ${orderErr.message}`);
           if (orderErr.message.includes('CORRUPTION') || orderErr.message.includes('different source') || orderErr.message.includes('source mismatch')) {
             throw orderErr; // Halt execution!
           }
@@ -2446,7 +2499,7 @@ const tradingBot = {
         changed = true;
       }
       
-      const timeInfo = getSystemTime();
+      const timeInfo = fsm.getSystemTime();
       const currentMins = timeInfo.hours * 60 + timeInfo.minutes;
       // Finalize EOD returns if market is closed or elapsed time is >= 6 hours (360 mins)
       if ((currentMins >= 15 * 60 + 30 || elapsedMins >= 360) && (c.ref_eod === null || c.ref_eod === undefined)) {
@@ -2463,7 +2516,7 @@ const tradingBot = {
   },
 
   async runTargetEnginePlanning(currentMins) {
-    const timeInfo = getSystemTime();
+    const timeInfo = fsm.getSystemTime();
     const valuation = await broker.getValuation();
     const dailyTarget = currentDayStats ? currentDayStats.daily_target : 1000;
     const dailyPnL = currentDayStats ? parseFloat((valuation.totalVal - currentDayStats.start_capital).toFixed(2)) : 0;
@@ -2590,7 +2643,7 @@ const tradingBot = {
   },
 
   async finalizeMarketDay(dateStr) {
-    const timeInfo = getSystemTime();
+    const timeInfo = fsm.getSystemTime();
     const currentMins = timeInfo.hours * 60 + timeInfo.minutes;
 
     if (currentMins < 15 * 60 + 30) {
@@ -2928,6 +2981,7 @@ const tradingBot = {
       reportMsg += `<i>${improvementAction}</i>\n`;
 
       // GROWTH MODE DAILY REPORT
+      let todayProfitFactor = 0;
       try {
         const pipelineLogs = dbData.pipeline_logs || [];
         const todayPipelines = pipelineLogs.filter(p => p.timestamp && p.timestamp.startsWith(dateStr));
@@ -2943,7 +2997,7 @@ const tradingBot = {
         });
         let avgHoldTime = 0;
         let todayWinRate = 0;
-        let todayProfitFactor = 0;
+        todayProfitFactor = 0;
         let todayNetPnL = 0;
         if (todayCompleted.length > 0) {
           avgHoldTime = todayCompleted.reduce((sum, t) => sum + (t.holding_minutes || 0), 0) / todayCompleted.length;

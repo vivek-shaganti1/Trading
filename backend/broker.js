@@ -43,32 +43,8 @@ let dataSourceName = 'Yahoo Finance API';
 let activeBroker = 'SIMULATOR';
 
 function isMarketOpenNow() {
-  // Use Intl API for correct IST parsing
-  const options = { timeZone: 'Asia/Kolkata', hour12: false, hour: 'numeric', minute: 'numeric', weekday: 'long' };
-  const formatter = new Intl.DateTimeFormat('en-US', options);
-  const parts = formatter.formatToParts(new Date());
-  
-  let hour = 0;
-  let minute = 0;
-  let dayName = '';
-  
-  for (const part of parts) {
-    if (part.type === 'hour') hour = parseInt(part.value, 10);
-    if (part.type === 'minute') minute = parseInt(part.value, 10);
-    if (part.type === 'weekday') dayName = part.value;
-  }
-  
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const day = days.indexOf(dayName);
-  
-  if (day === 0 || day === 6) return false;
-  
-  const currentMins = hour * 60 + minute;
-  
-  const startMins = 9 * 60 + 15; // 9:15 AM
-  const endMins = 15 * 60 + 30;  // 3:30 PM
-  
-  return currentMins >= startMins && currentMins < endMins;
+  const fsm = require('./lifecycleFSM');
+  return fsm.getTradingSession().isOpen;
 }
 
 // Native TOTP generator for Angel One SmartAPI login handshake

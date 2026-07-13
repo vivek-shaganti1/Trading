@@ -1295,6 +1295,12 @@ const db = {
           if (mRows && mRows.length > 0) {
             state.user_instructions = mRows[0].user_instructions || {};
           }
+          
+          // CRITICAL: Synchronize the fetched DB state back to localDb to prevent alternating mismatch
+          const currentData = readLocalDb();
+          currentData.portfolio_state = state;
+          writeLocalDb(currentData);
+          
           return state;
         }
       } catch (err) {
