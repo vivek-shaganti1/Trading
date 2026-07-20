@@ -41,7 +41,23 @@ let agentLeaderboard = {
   12: { name: 'Agent 12: Smart Money Agent', profitContribution: 0.0, lossContribution: 0.0, actualProfitContribution: 0.0, actualLossContribution: 0.0, todayProfitContribution: 0.0, todayLossContribution: 0.0, sharpeContribution: 0.0, drawdownContribution: 0.0, weight: 0.12 } // SMC Agent (12%)
 };
 
-async function callGemini(symbol, ltp, pred1, pred4, pred5) {
+async function fetchSymbolNews(symbol) {
+  try {
+    const cleanSym = symbol.replace('.NS', '');
+    const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${cleanSym}`;
+    const res = await withResilience('broker', async () => await fetch(url), 2, 500);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data?.news || []).slice(0, 5).map(item => ({
+      title: item.title,
+      publisher: item.publisher
+    }));
+  } catch (err) {
+    return [];
+  }
+}
+
+async function callGemini(symbol, ltp, pred1, pred4, pred5, newsHeadlines = []) {
   if (!config.GEMINI_API_KEY) {
     return runGeminiFallback(symbol, pred4?.indicators);
   }
@@ -64,8 +80,11 @@ async function callGemini(symbol, ltp, pred1, pred4, pred5) {
     - Recommended Signal: ${pred5.signal}
     - Reasoning: ${pred5.reasoning || ''}
     
+    Latest News Headlines for ${symbol}:
+    ${newsHeadlines.length > 0 ? newsHeadlines.map((h, i) => `${i+1}. ${h.title} (by ${h.publisher})`).join('\n') : 'No recent headlines found.'}
+    
     Your role:
-    1. Provide an independent External AI trading decision (BUY, SELL, or HOLD) based on their signals, index direction, volatility, and global macro trends.
+    1. Provide an independent External AI trading decision (BUY, SELL, or HOLD) based on their signals, news sentiment, index direction, volatility, and global macro trends.
     2. Act as the Debate Moderator. Debate their outputs, challenge any weak logic, and output a debate summary explaining which signals were discarded and why.
     
     Respond strictly in JSON format matching this schema:
@@ -137,7 +156,7 @@ function runGeminiFallback(symbol, indicators) {
   return { signal, confidence, reasoning: reason };
 }
 
-async function callGroq(symbol, ltp, pred1, pred4, pred5) {
+async function callGroq(symbol, ltp, pred1, pred4, pred5, newsHeadlines = []) {
   if (!config.GROQ_API_KEY) {
     return runGroqFallback(symbol, pred4?.indicators);
   }
@@ -160,8 +179,11 @@ async function callGroq(symbol, ltp, pred1, pred4, pred5) {
     - Recommended Signal: ${pred5.signal}
     - Reasoning: ${pred5.reasoning || ''}
     
+    Latest News Headlines for ${symbol}:
+    ${newsHeadlines.length > 0 ? newsHeadlines.map((h, i) => `${i+1}. ${h.title} (by ${h.publisher})`).join('\n') : 'No recent headlines found.'}
+    
     Your role:
-    1. Provide an independent External AI trading decision (BUY, SELL, or HOLD) based on technical setup, macroeconomic context, and volume/momentum.
+    1. Provide an independent External AI trading decision (BUY, SELL, or HOLD) based on technical setup, macroeconomic context, news sentiment, and volume/momentum.
     2. Respond strictly in JSON format matching this schema:
     {
       "signal": "BUY" | "SELL" | "HOLD",
@@ -425,18 +447,19 @@ const predictor = {
     const alignedMTF = trendVotes.BUY >= 3 ? 'BUY' : (trendVotes.SELL >= 3 ? 'SELL' : 'HOLD');
 
     // 2. Run core models in parallel for voting consensus
-    const [pred1, pred4, pred5, pred11] = await Promise.all([
+    const [pred1, pred4, pred5, pred11, newsHeadlines] = await Promise.all([
       marketModel.predict(symbol, m5History.closes),
       agent3_technicals.predict(symbol, m5History.closes),
       agent4_context.predict(),
-      priceActionAgent.predict(symbol, m5History.closes)
+      priceActionAgent.predict(symbol, m5History.closes),
+      fetchSymbolNews(symbol)
     ]);
 
     const pred12 = smcAgent.predict(symbol, candles5M);
 
     const [pred2, pred3] = await Promise.all([
-      callGemini(symbol, ltp, pred1, pred4, pred5),
-      callGroq(symbol, ltp, pred1, pred4, pred5)
+      callGemini(symbol, ltp, pred1, pred4, pred5, newsHeadlines),
+      callGroq(symbol, ltp, pred1, pred4, pred5, newsHeadlines)
     ]);
 
     const adx = pred4.indicators?.trendStrength === 'STRONG_UP' || pred4.indicators?.trendStrength === 'STRONG_DOWN' ? 28 : 18;

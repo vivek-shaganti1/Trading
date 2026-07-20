@@ -19,7 +19,9 @@ const riskEngine = {
     volatility = 1.0,
     portfolioHeat = 0,
     correlation = 0.20,
-    executionScore = 1.0
+    executionScore = 1.0,
+    entryPrice = null,
+    stopLossPrice = null
   }) {
     // 1. Enforce Daily Loss / Drawdown Limits
     const portfolio = await db.getPortfolioState();
@@ -68,8 +70,12 @@ const riskEngine = {
     finalRiskFraction = Math.min(MAX_CAPITAL_RISK, Math.max(0.002, finalRiskFraction));
 
     // Convert risk fraction to allocation size (assuming distance to Stop Loss defines size)
-    // For standard allocation percent equivalent:
-    let adjustedSize = (finalRiskFraction / 0.02) * 20; // Scale relative to a standard 20% allocation for 2% risk
+    let adjustedSize = (finalRiskFraction / 0.02) * 20; // Default fallback
+    if (entryPrice && stopLossPrice && entryPrice > stopLossPrice) {
+      const slDistPct = (entryPrice - stopLossPrice) / entryPrice;
+      // Size = finalRiskFraction / slDistPct
+      adjustedSize = (finalRiskFraction / Math.max(0.005, slDistPct)) * 100;
+    }
     adjustedSize = Math.max(5, Math.min(25, adjustedSize));
 
     // 6. Sector Exposure Constraints (Cap at 30% for Phase 19)

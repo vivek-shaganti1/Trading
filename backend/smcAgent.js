@@ -1,6 +1,96 @@
 // SMC Agent for Smart Money Concepts (SMC) Analysis (Section 1)
+
+function findSwings(candles) {
+  const swingHighs = [];
+  const swingLows = [];
+  // Require 2 candles on left and right to confirm a local peak/valley
+  for (let i = 2; i < candles.length - 2; i++) {
+    const h = candles[i].high;
+    const l = candles[i].low;
+    if (h > candles[i - 1].high && h > candles[i - 2].high && h > candles[i + 1].high && h > candles[i + 2].high) {
+      swingHighs.push({ price: h, index: i });
+    }
+    if (l < candles[i - 1].low && l < candles[i - 2].low && l < candles[i + 1].low && l < candles[i + 2].low) {
+      swingLows.push({ price: l, index: i });
+    }
+  }
+  return { swingHighs, swingLows };
+}
+
+function findUnmitigatedOBsAndFVGs(candles) {
+  const obs = []; // { type: 'BULLISH'|'BEARISH', low: number, high: number, index: number }
+  const fvgs = []; // { type: 'BULLISH'|'BEARISH', lowLimit: number, highLimit: number, index: number }
+
+  for (let i = 2; i < candles.length; i++) {
+    const cPrev2 = candles[i - 2];
+    const cPrev1 = candles[i - 1];
+    const cCurr = candles[i];
+
+    // 1. Check Mitigation for existing blocks by current candle high/low
+    for (let j = obs.length - 1; j >= 0; j--) {
+      const ob = obs[j];
+      if (ob.type === 'BULLISH' && cCurr.low <= ob.low) {
+        obs.splice(j, 1); // Mitigated / breached
+      } else if (ob.type === 'BEARISH' && cCurr.high >= ob.high) {
+        obs.splice(j, 1); // Mitigated / breached
+      }
+    }
+
+    for (let j = fvgs.length - 1; j >= 0; j--) {
+      const fvg = fvgs[j];
+      if (fvg.type === 'BULLISH' && cCurr.low <= fvg.lowLimit) {
+        fvgs.splice(j, 1); // FVG completely filled
+      } else if (fvg.type === 'BEARISH' && cCurr.high >= fvg.highLimit) {
+        fvgs.splice(j, 1); // FVG completely filled
+      }
+    }
+
+    // 2. Detect New Fair Value Gaps (FVG)
+    if (cCurr.low > cPrev2.high) {
+      fvgs.push({
+        type: 'BULLISH',
+        lowLimit: cPrev2.high,
+        highLimit: cCurr.low,
+        index: i
+      });
+    } else if (cCurr.high < cPrev2.low) {
+      fvgs.push({
+        type: 'BEARISH',
+        lowLimit: cCurr.high,
+        highLimit: cPrev2.low,
+        index: i
+      });
+    }
+
+    // 3. Detect New Order Blocks (OB)
+    // Bullish OB: An aggressive green candle body exceeds previous candle high
+    const isBullishImpulse = cCurr.close > cCurr.open && (cCurr.close - cCurr.open) > (cPrev1.high - cPrev1.low);
+    if (isBullishImpulse && cPrev1.close < cPrev1.open) {
+      obs.push({
+        type: 'BULLISH',
+        low: cPrev1.low,
+        high: cPrev1.high,
+        index: i - 1
+      });
+    }
+
+    // Bearish OB: An aggressive red candle body exceeds previous candle low
+    const isBearishImpulse = cCurr.close < cCurr.open && (cCurr.open - cCurr.close) > (cPrev1.high - cPrev1.low);
+    if (isBearishImpulse && cPrev1.close > cPrev1.open) {
+      obs.push({
+        type: 'BEARISH',
+        low: cPrev1.low,
+        high: cPrev1.high,
+        index: i - 1
+      });
+    }
+  }
+
+  return { obs, fvgs };
+}
+
 function predict(symbol, candles) {
-  if (!candles || candles.length < 10) {
+  if (!candles || candles.length < 15) {
     return {
       vote: 'HOLD',
       confidence: 0.50,
@@ -21,94 +111,105 @@ function predict(symbol, candles) {
   const len = candles.length;
   const ltp = closes[len - 1];
 
-  // A. Market Structure (HH, HL, LH, LL)
+  // 1. Get fractal swings
+  const { swingHighs, swingLows } = findSwings(candles);
+  
+  // 2. Get unmitigated blocks
+  const { obs, fvgs } = findUnmitigatedOBsAndFVGs(candles);
+
+  // A. Market Structure (Dynamic direction of swings)
   let structure = 'RANGING';
   let structureScore = 50;
-  const recentHighs = highs.slice(-5);
-  const recentLows = lows.slice(-5);
+  if (swingHighs.length >= 2 && swingLows.length >= 2) {
+    const lastH = swingHighs[swingHighs.length - 1].price;
+    const prevH = swingHighs[swingHighs.length - 2].price;
+    const lastL = swingLows[swingLows.length - 1].price;
+    const prevL = swingLows[swingLows.length - 2].price;
 
-  const maxH = Math.max(...recentHighs);
-  const minL = Math.min(...recentLows);
-
-  if (closes[len - 1] > closes[len - 5]) {
-    structure = 'BULLISH';
-    structureScore = 75;
-  } else if (closes[len - 1] < closes[len - 5]) {
-    structure = 'BEARISH';
-    structureScore = 25;
+    if (lastH > prevH && lastL > prevL) {
+      structure = 'BULLISH';
+      structureScore = 80;
+    } else if (lastH < prevH && lastL < prevL) {
+      structure = 'BEARISH';
+      structureScore = 20;
+    }
   }
 
   // B. Break Of Structure (BOS)
   let bosType = 'None';
   let bosScore = 50;
-  const prevPeakHigh = Math.max(...highs.slice(-10, -3));
-  const prevValleyLow = Math.min(...lows.slice(-10, -3));
+  if (swingHighs.length > 0 && swingLows.length > 0) {
+    const activeHigh = swingHighs[swingHighs.length - 1].price;
+    const activeLow = swingLows[swingLows.length - 1].price;
 
-  if (ltp > prevPeakHigh) {
-    bosType = 'BULLISH_BOS';
-    bosScore = 80;
-  } else if (ltp < prevValleyLow) {
-    bosType = 'BEARISH_BOS';
-    bosScore = 20;
+    if (ltp > activeHigh) {
+      bosType = 'BULLISH_BOS';
+      bosScore = 85;
+    } else if (ltp < activeLow) {
+      bosType = 'BEARISH_BOS';
+      bosScore = 15;
+    }
   }
 
   // C. Change Of Character (CHOCH)
   let chochType = 'None';
   let chochScore = 50;
-  const rangeHigh = Math.max(...highs.slice(-15, -5));
-  const rangeLow = Math.min(...lows.slice(-15, -5));
+  if (swingHighs.length >= 2 && swingLows.length >= 2) {
+    const keyHigh = Math.max(...swingHighs.slice(-2).map(s => s.price));
+    const keyLow = Math.min(...swingLows.slice(-2).map(s => s.price));
 
-  if (ltp > rangeHigh) {
-    chochType = 'BULLISH_CHOCH';
-    chochScore = 85;
-  } else if (ltp < rangeLow) {
-    chochType = 'BEARISH_CHOCH';
-    chochScore = 15;
+    if (ltp > keyHigh) {
+      chochType = 'BULLISH_CHOCH';
+      chochScore = 90;
+    } else if (ltp < keyLow) {
+      chochType = 'BEARISH_CHOCH';
+      chochScore = 10;
+    }
   }
 
   // D. Liquidity Sweeps
   let liquidityType = 'None';
   let liquidityScore = 50;
-  if (highs[len - 1] > prevPeakHigh && closes[len - 1] < prevPeakHigh) {
-    liquidityType = 'EQUAL_HIGH_SWEEP';
-    liquidityScore = 30; // bearish sweep
-  } else if (lows[len - 1] < prevValleyLow && closes[len - 1] > prevValleyLow) {
-    liquidityType = 'EQUAL_LOW_SWEEP';
-    liquidityScore = 70; // bullish sweep
+  if (swingHighs.length > 0 && swingLows.length > 0) {
+    const targetHigh = swingHighs[swingHighs.length - 1].price;
+    const targetLow = swingLows[swingLows.length - 1].price;
+
+    if (highs[len - 1] > targetHigh && ltp < targetHigh) {
+      liquidityType = 'BEARISH_SWEEP';
+      liquidityScore = 25;
+    } else if (lows[len - 1] < targetLow && ltp > targetLow) {
+      liquidityType = 'BULLISH_SWEEP';
+      liquidityScore = 75;
+    }
   }
 
-  // E. Order Blocks (OB)
+  // E. Order Block & FVG Proximity/Mitigation check
   let obType = 'None';
   let obScore = 50;
-  let obStatus = 'Fresh';
-  
-  // Last opposing candle before a strong move
-  const firstCandleColor = closes[len - 3] > closes[len - 4] ? 'GREEN' : 'RED';
-  const secondCandleColor = closes[len - 2] > closes[len - 3] ? 'GREEN' : 'RED';
-
-  if (firstCandleColor === 'RED' && secondCandleColor === 'GREEN' && ltp > closes[len - 2]) {
-    obType = 'BULLISH_OB';
-    obScore = 75;
-  } else if (firstCandleColor === 'GREEN' && secondCandleColor === 'RED' && ltp < closes[len - 2]) {
-    obType = 'BEARISH_OB';
-    obScore = 25;
-  }
-
-  // F. Fair Value Gaps (FVG)
   let fvgType = 'None';
   let fvgScore = 50;
-  let fvgStatus = 'Open';
 
-  // Bullish FVG: Low of candle 3 is greater than High of candle 1
-  if (lows[len - 1] > highs[len - 3]) {
-    fvgType = 'BULLISH_FVG';
+  const activeBullishOB = obs.find(ob => ob.type === 'BULLISH');
+  const activeBearishOB = obs.find(ob => ob.type === 'BEARISH');
+  if (activeBullishOB && ltp >= activeBullishOB.low && ltp <= activeBullishOB.high) {
+    obType = 'BULLISH_OB_TEST';
+    obScore = 80;
+  } else if (activeBearishOB && ltp >= activeBearishOB.low && ltp <= activeBearishOB.high) {
+    obType = 'BEARISH_OB_TEST';
+    obScore = 20;
+  }
+
+  const activeBullishFVG = fvgs.find(f => f.type === 'BULLISH');
+  const activeBearishFVG = fvgs.find(f => f.type === 'BEARISH');
+  if (activeBullishFVG && ltp >= activeBullishFVG.lowLimit && ltp <= activeBullishFVG.highLimit) {
+    fvgType = 'BULLISH_FVG_TEST';
     fvgScore = 80;
-  } else if (highs[len - 1] < lows[len - 3]) {
-    fvgType = 'BEARISH_FVG';
+  } else if (activeBearishFVG && ltp >= activeBearishFVG.lowLimit && ltp <= activeBearishFVG.highLimit) {
+    fvgType = 'BEARISH_FVG_TEST';
     fvgScore = 20;
   }
 
-  // G. Premium / Discount Zones
+  // F. Premium / Discount Zones
   const highest = Math.max(...highs.slice(-14));
   const lowest = Math.min(...lows.slice(-14));
   const equilibrium = (highest + lowest) / 2;
@@ -117,15 +218,15 @@ function predict(symbol, candles) {
 
   if (ltp > equilibrium) {
     premiumDiscountZone = 'PREMIUM';
-    premiumDiscountScore = 35; // expensive to buy
+    premiumDiscountScore = 35;
   } else if (ltp < equilibrium) {
     premiumDiscountZone = 'DISCOUNT';
-    premiumDiscountScore = 65; // cheap to buy
+    premiumDiscountScore = 65;
   }
 
-  // Final Vote & Confidence Output
+  // G. Vote Compilation
   let vote = 'HOLD';
-  let totalScore = (structureScore + bosScore + chochScore + liquidityScore + obScore + fvgScore + premiumDiscountScore) / 7;
+  const totalScore = (structureScore + bosScore + chochScore + liquidityScore + obScore + fvgScore + premiumDiscountScore) / 7;
   let confidence = 0.50;
 
   if (totalScore > 58) {
@@ -136,11 +237,11 @@ function predict(symbol, candles) {
     confidence = 0.50 + (42 - totalScore) / 100;
   }
 
-  const reasoning = `SMC Analysis: structure=${structure}, BOS=${bosType}, CHOCH=${chochType}, liquidity=${liquidityType}, OB=${obType}, FVG=${fvgType}, zone=${premiumDiscountZone}.`;
+  const reasoning = `SMC Analysis: structure=${structure}, BOS=${bosType}, CHOCH=${chochType}, liquidity=${liquidityType}, OB=${obType}, FVG=${fvgType}, zone=${premiumDiscountZone}. Active OBs: ${obs.filter(o => o.type === 'BULLISH').length} Bull, ${obs.filter(o => o.type === 'BEARISH').length} Bear.`;
 
   return {
     vote,
-    confidence: parseFloat(Math.min(0.92, confidence).toFixed(2)),
+    confidence: parseFloat(Math.min(0.95, confidence).toFixed(2)),
     structureScore,
     bosScore,
     chochScore,

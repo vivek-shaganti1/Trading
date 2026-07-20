@@ -2188,7 +2188,9 @@ const tradingBot = {
         volatility: execQuality.expectedSlippagePct > 0.1 ? 1.6 : 0.8,
         portfolioHeat: correlationEvaluation.totalPortfolioRisk,
         correlation: correlationEvaluation.avgCorrelation,
-        executionScore: execQuality.score
+        executionScore: execQuality.score,
+        entryPrice: item.price,
+        stopLossPrice: prediction.stopLossPrice
       });
 
       if (!riskEvaluation.approved) {
