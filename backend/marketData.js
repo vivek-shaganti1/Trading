@@ -19,21 +19,25 @@ const responseCache = {};
 const requestQueue = [];
 let isQueueProcessing = false;
 
-// Request Budgeting (Max 60 requests per minute to prevent provider abuse)
+// Request Budgeting (Max 180 requests per minute to prevent provider abuse)
 const requestBudget = {
-  maxPerMinute: 60,
+  maxPerMinute: 180,
   callsThisMinute: 0,
   resetTime: Date.now() + 60000
 };
 
-function checkRequestBudget() {
+async function checkRequestBudget() {
   const now = Date.now();
   if (now > requestBudget.resetTime) {
     requestBudget.callsThisMinute = 0;
     requestBudget.resetTime = now + 60000;
   }
   if (requestBudget.callsThisMinute >= requestBudget.maxPerMinute) {
-    throw new Error(`[REQUEST BUDGET EXHAUSTED] Rate budget of ${requestBudget.maxPerMinute} requests/minute has been exceeded.`);
+    const waitMs = Math.max(100, requestBudget.resetTime - now + 100);
+    console.log(`[MARKET DATA BUDGET] Rate limit threshold reached (${requestBudget.maxPerMinute}/min). Pausing queue for ${waitMs}ms...`);
+    await new Promise(r => setTimeout(r, waitMs));
+    requestBudget.callsThisMinute = 0;
+    requestBudget.resetTime = Date.now() + 60000;
   }
   requestBudget.callsThisMinute++;
 }
@@ -55,7 +59,7 @@ async function processRequestQueue() {
   while (requestQueue.length > 0) {
     const { fetchFunction, resolve, reject } = requestQueue.shift();
     try {
-      checkRequestBudget();
+      await checkRequestBudget();
       const result = await withResilience('yahoo', fetchFunction, 3, 500);
       resolve(result);
     } catch (err) {

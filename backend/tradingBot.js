@@ -99,9 +99,9 @@ function calculateAdaptiveSizing(symbol, prediction, valuation, tqs, currentThre
   
   const idleCashPct = (valuation.balance / valuation.totalVal) * 100;
   
-  // Clamp to [3, 10] range to strictly manage drawdown under 20%
+  // Clamp to [3, 25] range to strictly manage drawdown under 20%
   const rawAllocation = allocationPct;
-  allocationPct = Math.max(3, Math.min(10, allocationPct));
+  allocationPct = Math.max(3, Math.min(25, allocationPct));
   allocationPct = parseFloat(allocationPct.toFixed(2));
   
   const reasoning = `Base 20% | Conviction Bonus: ${convictionBonus.toFixed(1)}% | Win Rate Bonus: ${winRateBonus.toFixed(1)}% | Volatility: ${volatilityLevel} | Losses streak count: ${consecutiveLossesCount} | Win Streak: ${winStreak} | Daily PnL Progress: ${progressPct.toFixed(1)}% | Idle Cash: ${idleCashPct.toFixed(1)}% | Final Size: ${allocationPct}% (raw: ${rawAllocation.toFixed(1)}%)`;
@@ -1194,20 +1194,40 @@ const tradingBot = {
         pos.maxPrice = Math.max(pos.maxPrice || pos.avgPrice, currentPrice);
         pos.currentPrice = currentPrice;
 
-        // Get historical candles for evaluation
-        const history = await marketData.getHistory(pos.symbol, [], '5m', '2d');
-        let formattedCandles = [];
-        if (history && history.closes && history.closes.length > 0) {
-          formattedCandles = history.closes.map((c, idx) => ({
-            close: c,
-            open: (history.opens && history.opens[idx]) || c,
-            high: (history.highs && history.highs[idx]) || c,
-            low: (history.lows && history.lows[idx]) || c,
-            volume: history.volumes ? history.volumes[idx] : 1000
-          }));
+        // 1. Direct LTP Stop-Loss / Take-Profit / Trailing Stop Safeguards (Instant 0-latency execution)
+        const stopLoss = pos.stopLossPrice || (pos.avgPrice * 0.98);
+        const targetPrice = pos.targetPrice || (pos.avgPrice * 1.03);
+        const trailStop = pos.maxPrice > (pos.avgPrice * 1.01) ? pos.maxPrice * 0.985 : 0;
+
+        let instantExitReason = null;
+        if (currentPrice <= stopLoss) {
+          instantExitReason = `Stop Loss Triggered (LTP ₹${currentPrice} <= SL ₹${stopLoss})`;
+        } else if (currentPrice >= targetPrice) {
+          instantExitReason = `Take Profit Target Reached (LTP ₹${currentPrice} >= TP ₹${targetPrice})`;
+        } else if (trailStop > 0 && currentPrice <= trailStop) {
+          instantExitReason = `Trailing Stop Loss Triggered (LTP ₹${currentPrice} <= Trail ₹${trailStop.toFixed(2)})`;
         }
 
-        const exitEval = exitIntelligenceEngine.evaluatePositionExits(pos, formattedCandles);
+        // Get historical candles for deep exit evaluation (gracefully fallback if rate-limited)
+        let formattedCandles = [];
+        try {
+          const history = await marketData.getHistory(pos.symbol, [], '5m', '2d');
+          if (history && history.closes && history.closes.length > 0) {
+            formattedCandles = history.closes.map((c, idx) => ({
+              close: c,
+              open: (history.opens && history.opens[idx]) || c,
+              high: (history.highs && history.highs[idx]) || c,
+              low: (history.lows && history.lows[idx]) || c,
+              volume: history.volumes ? history.volumes[idx] : 1000
+            }));
+          }
+        } catch (candErr) {
+          // Fail silently on candle fetch error — instant LTP checks will handle emergency exits
+        }
+
+        const exitEval = instantExitReason 
+          ? { shouldExit: true, reason: instantExitReason }
+          : exitIntelligenceEngine.evaluatePositionExits(pos, formattedCandles);
 
         if (exitEval.shouldExit) {
           const exitReason = exitEval.reason;

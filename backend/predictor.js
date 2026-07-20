@@ -379,19 +379,40 @@ const predictor = {
     }
     const weights = await this.getModelWeights();
 
+    // Helper: Resample 5M candle history into higher timeframe histories (15M / 1H) in memory
+    function resampleHistory(m5History, groupSize) {
+      if (!m5History || !m5History.closes || m5History.closes.length === 0) {
+        return { closes: [], opens: [], highs: [], lows: [], volumes: [] };
+      }
+      const closes = [], opens = [], highs = [], lows = [], volumes = [];
+      const len = m5History.closes.length;
+      for (let i = 0; i < len; i += groupSize) {
+        const chunkCloses = m5History.closes.slice(i, i + groupSize);
+        const chunkOpens = m5History.opens ? m5History.opens.slice(i, i + groupSize) : chunkCloses;
+        const chunkHighs = m5History.highs ? m5History.highs.slice(i, i + groupSize) : chunkCloses;
+        const chunkLows = m5History.lows ? m5History.lows.slice(i, i + groupSize) : chunkCloses;
+        const chunkVols = m5History.volumes ? m5History.volumes.slice(i, i + groupSize) : [];
+
+        opens.push(chunkOpens[0]);
+        closes.push(chunkCloses[chunkCloses.length - 1]);
+        highs.push(Math.max(...chunkHighs));
+        lows.push(Math.min(...chunkLows));
+        volumes.push(chunkVols.reduce((a, b) => a + b, 0));
+      }
+      return { closes, opens, highs, lows, volumes, source: 'LIVE' };
+    }
+
     // 1. Fetch MTF histories for Multi-Timeframe Confluence (Section 4)
-    let d1History, h1History, m15History, m5History, m1History;
+    let d1History, m5History, h1History, m15History, m1History;
     try {
-      [d1History, h1History, m15History, m5History, m1History] = await Promise.all([
+      [d1History, m5History] = await Promise.all([
         marketData.getHistory(symbol, [], '1d', '3mo'),
-        marketData.getHistory(symbol, [], '1h', '5d'),
-        marketData.getHistory(symbol, [], '15m', '5d'),
-        marketData.getHistory(symbol, [], '5m', '5d'),
-        marketData.getHistory(symbol, [], '1m', '1d')
+        marketData.getHistory(symbol, [], '5m', '5d')
       ]);
+      m15History = resampleHistory(m5History, 3);
+      h1History = resampleHistory(m5History, 12);
+      m1History = m5History;
     } catch (err) {
-      // Do NOT generate mock/random candles — random candles corrupt AI signals.
-      // Rethrow so the calling pipeline can log the rejection and skip this symbol.
       console.warn(`[PREDICTOR] Market data unavailable for ${symbol}: ${err.message}. Skipping symbol.`);
       throw new Error(`Market data unavailable for ${symbol}: ${err.message}`);
     }

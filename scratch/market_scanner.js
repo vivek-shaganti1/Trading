@@ -55,7 +55,27 @@ const marketScanner = {
     const startScanTimeMs = Date.now();
     console.log('[MARKET SCANNER] Starting 5,000+ NSE Stocks multi-stage pipeline research...');
     const universe = getUniverse();
-    
+
+    // Ensure currently held stocks are always fetched live by moving them to the front
+    let heldSymbols = [];
+    try {
+      const portfolio = db.readLocalDb().portfolio_state;
+      if (portfolio && portfolio.holding_stocks) {
+        heldSymbols = portfolio.holding_stocks.map(h => h.symbol);
+      }
+    } catch (err) {
+      // Fail silently
+    }
+
+    const reorderedUniverse = [...universe];
+    heldSymbols.forEach(symbol => {
+      const idx = reorderedUniverse.findIndex(s => s.symbol === symbol);
+      if (idx > -1) {
+        const [item] = reorderedUniverse.splice(idx, 1);
+        reorderedUniverse.unshift(item);
+      }
+    });
+
     const stockResults = [];
     const sectorPerformance = {};
 
@@ -99,26 +119,6 @@ const marketScanner = {
       // and mock the rest dynamically to prevent Yahoo Finance 429 blocks.
       const batchSize = 20;
       const promises = [];
-      
-      // Ensure currently held stocks are always fetched live by moving them to the front
-      let heldSymbols = [];
-      try {
-        const portfolio = db.readLocalDb().portfolio_state;
-        if (portfolio && portfolio.holding_stocks) {
-          heldSymbols = portfolio.holding_stocks.map(h => h.symbol);
-        }
-      } catch (err) {
-        // Fail silently
-      }
-
-      const reorderedUniverse = [...universe];
-      heldSymbols.forEach(symbol => {
-        const idx = reorderedUniverse.findIndex(s => s.symbol === symbol);
-        if (idx > -1) {
-          const [item] = reorderedUniverse.splice(idx, 1);
-          reorderedUniverse.unshift(item);
-        }
-      });
 
       // We will only do live fetches for the first 150 stocks (typically Nifty 150/Liquid constituents)
       const liquidUniverse = reorderedUniverse.slice(0, 150);
@@ -251,7 +251,7 @@ const marketScanner = {
 
     if (!isSimulator) {
       // In LIVE mode, filter out any synthetic/illiquid stocks
-      const liquidSymbols = new Set(universe.slice(0, liquidSlice).map(s => s.symbol));
+      const liquidSymbols = new Set(reorderedUniverse.slice(0, liquidSlice).map(s => s.symbol));
       candidatesLongs = candidatesLongs.filter(s => liquidSymbols.has(s.symbol));
       candidatesShorts = candidatesShorts.filter(s => liquidSymbols.has(s.symbol));
     }

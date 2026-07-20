@@ -247,35 +247,13 @@ let pendingWrite = null;
 
 function writeLocalDb(data) {
   localDbCache = data;
-  if (isWriting) {
-    pendingWrite = data;
-    return;
+  try {
+    const tmpFile = DB_FILE + '.tmp';
+    fs.writeFileSync(tmpFile, JSON.stringify(data, null, 2), 'utf8');
+    fs.renameSync(tmpFile, DB_FILE);
+  } catch (err) {
+    console.error('[DB ERROR] Failed to write local DB:', err.message);
   }
-  isWriting = true;
-  
-  // Non-blocking atomic disk I/O
-  const tmpFile = DB_FILE + '.tmp';
-  fs.writeFile(tmpFile, JSON.stringify(data, null, 2), (err) => {
-    if (err) {
-      console.error('[DB ERROR] Failed to write db.json.tmp:', err.message);
-      isWriting = false;
-      if (pendingWrite) {
-        const nextData = pendingWrite;
-        pendingWrite = null;
-        writeLocalDb(nextData);
-      }
-      return;
-    }
-    fs.rename(tmpFile, DB_FILE, (renameErr) => {
-      isWriting = false;
-      if (renameErr) console.error('[DB ERROR] Failed to rename db.json.tmp:', renameErr.message);
-      if (pendingWrite) {
-        const nextData = pendingWrite;
-        pendingWrite = null;
-        writeLocalDb(nextData);
-      }
-    });
-  });
 }
 
 // Check database connectivity with retries & backoff
