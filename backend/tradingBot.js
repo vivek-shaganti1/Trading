@@ -1793,9 +1793,13 @@ const tradingBot = {
       await this.updateDailyPNL(valuation);
     }
 
-    if (this.isMarketOpenWindow(timeInfo) && currentMins % 30 === 0 && lastStatusSentMins !== currentMins) {
-      lastStatusSentMins = currentMins;
-      await this.sendPeriodicStatusUpdate(timeInfo);
+    if (this.isMarketOpenWindow(timeInfo) && currentMins % 30 === 0) {
+      const dbState = db.readLocalDb();
+      if (dbState.last_status_sent_mins !== currentMins) {
+        dbState.last_status_sent_mins = currentMins;
+        db.writeLocalDb(dbState);
+        await this.sendPeriodicStatusUpdate(timeInfo);
+      }
     }
 
     // EOD Square Off Trigger
@@ -2620,7 +2624,8 @@ const tradingBot = {
       const valuation = await broker.getValuation();
       const portfolio = await db.getPortfolioState();
       const holdings = portfolio.holding_stocks || [];
-      const dailyPnL = valuation.totalVal - currentDayStats.start_capital;
+      const startCap = (currentDayStats && currentDayStats.start_capital) || valuation.totalVal;
+      const dailyPnL = valuation.totalVal - startCap;
 
       // Fetch latest scanner rankings for Top Long / Short
       const scanResults = await db.getLatestScannerRankings();
@@ -2641,7 +2646,7 @@ const tradingBot = {
 
       let statusMsg = `⏳ <b>MID-SESSION UPDATE - ${timeInfo.hours.toString().padStart(2, '0')}:${timeInfo.minutes.toString().padStart(2, '0')} IST</b>\n\n`;
       statusMsg += `💰 <b>Portfolio Value:</b> ₹${valuation.totalVal.toFixed(2)}\n`;
-      statusMsg += `📈 <b>Today's Net PnL:</b> ₹${dailyPnL.toFixed(2)} (${((dailyPnL / currentDayStats.start_capital) * 100).toFixed(2)}%)\n`;
+      statusMsg += `📈 <b>Today's Net PnL:</b> ₹${dailyPnL.toFixed(2)} (${((dailyPnL / startCap) * 100).toFixed(2)}%)\n`;
       statusMsg += `📂 <b>Open Positions:</b> ${holdings.length} active\n`;
       if (holdings.length > 0) {
         holdings.forEach(p => {
