@@ -633,7 +633,10 @@ const broker = {
         });
       }
     } else if (action === 'SELL') {
-      const stockIdx = updatedHoldingStocks.findIndex(s => s.symbol === symbol && s.strategy === strategy);
+      let stockIdx = updatedHoldingStocks.findIndex(s => s.symbol === symbol && s.strategy === strategy);
+      if (stockIdx === -1) {
+        stockIdx = updatedHoldingStocks.findIndex(s => s.symbol === symbol);
+      }
       if (stockIdx === -1 || updatedHoldingStocks[stockIdx].quantity < quantity) {
         throw new Error(`Insufficient stock holdings to SELL ${quantity} shares of ${symbol} (${strategy})`);
       }

@@ -1238,14 +1238,18 @@ const tradingBot = {
           const profitGivenBack = Math.max(0, peakValue - tradePnL);
           const detailedReason = `${exitReason} | Entry: ₹${pos.avgPrice} | PnL: ₹${tradePnL.toFixed(2)} | Return: ${returnPct.toFixed(2)}% | Peak PnL: ₹${peakValue.toFixed(2)} | Given Back: ₹${profitGivenBack.toFixed(2)}`;
 
+          let sellSuccess = false;
           try {
-            await agent17_execution.placeOrder(
+            const res = await agent17_execution.placeOrder(
               pos.symbol,
               'SELL',
               pos.quantity,
-              'CNC',
+              pos.strategy || 'CNC',
               detailedReason
             );
+            if (res && res.success !== false) {
+              sellSuccess = true;
+            }
             console.log(`\n[PIPELINE]`);
             console.log(`SELL ORDER CREATED`);
             console.log(`↓`);
@@ -1262,6 +1266,11 @@ const tradingBot = {
             console.log(`SELL ORDER FAILED`);
             console.log(`↓`);
             console.log(`BROKER REJECTED: ${err.message}`);
+          }
+
+          if (!sellSuccess) {
+            console.warn(`[PORTFOLIO EXIT SKIPPED] Sell order for ${pos.symbol} did not complete. Aborting post-exit alerts for this tick.`);
+            continue;
           }
 
           // Update losing streak count
