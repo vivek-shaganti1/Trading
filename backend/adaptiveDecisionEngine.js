@@ -130,24 +130,25 @@ function evaluateDecision(symbol, direction, inputs) {
   // Removing as a gate prevents neutral SMC readings (score=50) from vetoing valid price action setups.
 
   // Gate 8: AI Consensus Confirmation — softened thresholds
-  // AI confirms the trade, but shouldn't block a strong price-action setup
   let consensusConfirmed = false;
   if (!isBuy && !isSell) {
     rejections.push('Signal direction is neutral (HOLD)');
   } else {
-    const minWeight = Math.max(0.30, minConsensusWeight - 0.10);
-    const minConf = Math.max(0.45, minConfidenceThresh - 0.10);
-    if (isBuy && (buyWeight >= minWeight && buyConfidence >= minConf)) {
+    const minWeight = Math.max(0.25, minConsensusWeight - 0.15);
+    const minConf = Math.max(0.40, minConfidenceThresh - 0.15);
+    if (isBuy && (buyWeight >= minWeight && buyConfidence >= minConf && buyWeight >= sellWeight)) {
       consensusConfirmed = true;
-    } else if (isSell && (sellWeight >= minWeight && sellConfidence >= minConf)) {
+    } else if (isSell && (sellWeight >= minWeight && sellConfidence >= minConf && sellWeight >= buyWeight)) {
       consensusConfirmed = true;
-    } else if (candleScore >= 55 || structureScore >= 60) {
-      // Strong technical bar or structure overrides marginal consensus
+    } else if (isBuy && buyWeight > sellWeight && (candleScore >= 55 || structureScore >= 60)) {
+      // Strong technical bar or structure overrides marginal consensus ONLY IF buy weight > sell weight
+      consensusConfirmed = true;
+    } else if (isSell && sellWeight > buyWeight && (candleScore >= 55 || structureScore >= 60)) {
       consensusConfirmed = true;
     }
 
     if (!consensusConfirmed) {
-      rejections.push('AI consensus not confirmed and candle score insufficient to override');
+      rejections.push('AI consensus not confirmed and opposing votes outweigh setup');
     }
   }
 

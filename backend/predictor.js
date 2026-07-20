@@ -625,18 +625,6 @@ const predictor = {
       triggerSignal = isBullishClose ? 'BUY' : (isBearishClose ? 'SELL' : 'HOLD');
     }
 
-    // Primary signal: price action trigger must align with MTF direction
-    // If trigger is HOLD but MTF is aligned AND candle score is strong, use MTF direction
-    let primarySignal = 'HOLD';
-    if (alignedMTF === 'BUY' && (triggerSignal === 'BUY' || (triggerSignal === 'HOLD' && candleScore >= 60 && isBullishClose))) {
-      primarySignal = 'BUY';
-    } else if (alignedMTF === 'SELL' && (triggerSignal === 'SELL' || (triggerSignal === 'HOLD' && candleScore >= 60 && isBearishClose))) {
-      primarySignal = 'SELL';
-    } else if (triggerSignal !== 'HOLD' && trendVotes[triggerSignal] >= 2) {
-      // Even without full MTF alignment, if the trigger matches 2+ timeframes, consider it
-      primarySignal = triggerSignal;
-    }
-
     let activeWeightSum = 0;
     Object.keys(allSignals).forEach(id => {
       const p = allSignals[id];
@@ -651,7 +639,7 @@ const predictor = {
     Object.keys(allSignals).forEach(id => {
       const p = allSignals[id];
       if (p.failed) return;
-      const w = (weights[`agent${id}_weight`] || 0.1) / activeWeightSum;
+      const w = (weights[`agent${id}_weight`] || 0.1) / (activeWeightSum || 1);
       totalWeightedConfidence += p.confidence * w;
 
       if (p.signal === 'BUY') {
@@ -664,6 +652,23 @@ const predictor = {
         sellWeightSum += w;
       }
     });
+
+    // Primary signal: price action trigger must align with MTF direction AND multi-agent consensus
+    let primarySignal = 'HOLD';
+    if (alignedMTF === 'BUY' && (triggerSignal === 'BUY' || (triggerSignal === 'HOLD' && candleScore >= 60 && isBullishClose))) {
+      primarySignal = 'BUY';
+    } else if (alignedMTF === 'SELL' && (triggerSignal === 'SELL' || (triggerSignal === 'HOLD' && candleScore >= 60 && isBearishClose))) {
+      primarySignal = 'SELL';
+    } else if (triggerSignal !== 'HOLD' && trendVotes[triggerSignal] >= 2) {
+      primarySignal = triggerSignal;
+    }
+
+    // STRICT CONSENSUS GUARD: If multi-agent consensus strongly opposes the direction, veto primarySignal
+    if (primarySignal === 'BUY' && (sellWeight > buyWeight || buyWeight < 0.15)) {
+      primarySignal = 'HOLD';
+    } else if (primarySignal === 'SELL' && (buyWeight > sellWeight || sellWeight < 0.15)) {
+      primarySignal = 'HOLD';
+    }
 
     let minConfidenceThresh = 0.55;
     let minConsensusWeight = 0.45;
