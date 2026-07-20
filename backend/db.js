@@ -167,6 +167,7 @@ function initLocalDb() {
 let localDbCache = null;
 
 function readLocalDb() {
+  if (localDbCache) return localDbCache;
   try {
     if (fs.existsSync(DB_FILE)) {
       localDbCache = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));

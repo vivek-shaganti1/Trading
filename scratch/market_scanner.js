@@ -100,9 +100,29 @@ const marketScanner = {
       const batchSize = 20;
       const promises = [];
       
+      // Ensure currently held stocks are always fetched live by moving them to the front
+      let heldSymbols = [];
+      try {
+        const portfolio = db.readLocalDb().portfolio_state;
+        if (portfolio && portfolio.holding_stocks) {
+          heldSymbols = portfolio.holding_stocks.map(h => h.symbol);
+        }
+      } catch (err) {
+        // Fail silently
+      }
+
+      const reorderedUniverse = [...universe];
+      heldSymbols.forEach(symbol => {
+        const idx = reorderedUniverse.findIndex(s => s.symbol === symbol);
+        if (idx > -1) {
+          const [item] = reorderedUniverse.splice(idx, 1);
+          reorderedUniverse.unshift(item);
+        }
+      });
+
       // We will only do live fetches for the first 150 stocks (typically Nifty 150/Liquid constituents)
-      const liquidUniverse = universe.slice(0, 150);
-      const illiquidUniverse = universe.slice(150);
+      const liquidUniverse = reorderedUniverse.slice(0, 150);
+      const illiquidUniverse = reorderedUniverse.slice(150);
 
       for (let i = 0; i < liquidUniverse.length; i += batchSize) {
         const batch = liquidUniverse.slice(i, i + batchSize);

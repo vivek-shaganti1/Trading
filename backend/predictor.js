@@ -1292,5 +1292,4 @@ const predictor = {
   }
 };
 
-predictor.getPrediction = async () => ({ signal: "HOLD", confidence: 0, consensus: false });
 module.exports = predictor;
