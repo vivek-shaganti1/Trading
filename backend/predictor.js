@@ -613,15 +613,19 @@ const predictor = {
     if (['Morning Star', 'Bullish Engulfing', 'Hammer', 'Marubozu'].includes(candlePattern) || 
         (candlePattern === 'Pin Bar' && candleScoreDetails.reasoning.toLowerCase().includes('bullish')) ||
         (candlePattern === 'Outside Bar' && isBullishClose) ||
+        (candlePattern === 'Inside Bar' && isBullishClose) ||
+        (candlePattern === 'Doji' && isBullishClose && candleScore >= 50) ||
         (candlePattern === 'None' && candleCategory === 'Breakout' && isBullishClose)) {
       triggerSignal = 'BUY';
     } else if (['Evening Star', 'Bearish Engulfing', 'Shooting Star', 'Marubozu'].includes(candlePattern) || 
                (candlePattern === 'Pin Bar' && candleScoreDetails.reasoning.toLowerCase().includes('bearish')) ||
                (candlePattern === 'Outside Bar' && isBearishClose) ||
+               (candlePattern === 'Inside Bar' && isBearishClose) ||
+               (candlePattern === 'Doji' && isBearishClose && candleScore >= 50) ||
                (candlePattern === 'None' && candleCategory === 'Breakout' && isBearishClose)) {
       triggerSignal = 'SELL';
-    } else if (candlePattern === 'None' && candleScore >= 55) {
-      // No named pattern but a decent candle score — use close direction as trigger
+    } else if (['None', 'Inside Bar', 'Doji'].includes(candlePattern) && candleScore >= 55) {
+      // No named pattern or neutral patterns but decent candle score — use close direction as trigger
       triggerSignal = isBullishClose ? 'BUY' : (isBearishClose ? 'SELL' : 'HOLD');
     }
 

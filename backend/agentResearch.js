@@ -329,9 +329,12 @@ const agentResearch = {
 
       for (const mem of memories) {
         if (mem.symbol === symbol && (mem.outcome_pnl === null || mem.outcome_pnl === undefined)) {
-          mem.outcome_pnl = pnl;
-          mem.synced = false; // Mark for sync to postgres
-          updated++;
+          // Only backfill actual trade actions, not scanner logs marked HOLD
+          if (mem.signal === 'BUY' || mem.signal === 'SELL') {
+            mem.outcome_pnl = pnl;
+            mem.synced = false; // Mark for sync to postgres
+            updated++;
+          }
         }
       }
 
@@ -342,7 +345,7 @@ const agentResearch = {
         // Also update in postgres
         try {
           await db.runQueryDirect(
-            'UPDATE agent26_market_memory SET outcome_pnl = $1 WHERE symbol = $2 AND outcome_pnl IS NULL',
+            "UPDATE agent26_market_memory SET outcome_pnl = $1 WHERE symbol = $2 AND outcome_pnl IS NULL AND (signal = 'BUY' OR signal = 'SELL')",
             [pnl, symbol]
           );
         } catch (pgErr) {
