@@ -7,6 +7,8 @@ class LifecycleFSM extends events.EventEmitter {
     this.session = 'NONE';
     this.lifecycleLog = [];
     this.tickCycle = 0;
+    this.lastPrintTime = 0;
+    this.lastPrintReason = '';
   }
 
   isHoliday(dateStr) {
@@ -164,6 +166,13 @@ class LifecycleFSM extends events.EventEmitter {
   }
 
   printSchedulerBlock(reason, sessionDetails) {
+    const now = Date.now();
+    if (reason === this.lastPrintReason && (now - this.lastPrintTime) < 3600 * 1000) {
+      return;
+    }
+    this.lastPrintTime = now;
+    this.lastPrintReason = reason;
+
     console.log(`\n=====================================================`);
     console.log(`[SCHEDULER BLOCKED] WHY: ${reason}`);
     console.log(`Current UTC    : ${new Date().toISOString()}`);

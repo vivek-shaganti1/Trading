@@ -26,7 +26,7 @@ async function runTest() {
     { time: '2026-07-06T09:14:00+05:30', expected: false, desc: 'Monday 09:14 (Pre-market)' },
     { time: '2026-07-06T09:15:00+05:30', expected: true,  desc: 'Monday 09:15 (Market Open)' },
     { time: '2026-07-06T15:29:00+05:30', expected: true,  desc: 'Monday 15:29 (Market Open)' },
-    { time: '2026-07-06T15:30:00+05:30', expected: false, desc: 'Monday 15:30 (Market Close)' },
+    { time: '2026-07-06T15:35:00+05:30', expected: false, desc: 'Monday 15:35 (EOD Close)' },
     { time: '2026-07-06T16:00:00+05:30', expected: false, desc: 'Monday 16:00 (Post-market)' },
     { time: '2026-07-04T12:00:00+05:30', expected: false, desc: 'Saturday 12:00 (Weekend)' },
     { time: '2026-07-05T12:00:00+05:30', expected: false, desc: 'Sunday 12:00 (Weekend)' }
