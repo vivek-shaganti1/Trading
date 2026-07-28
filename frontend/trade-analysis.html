@@ -15,12 +15,12 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      background: #0b0f19;
+      background: var(--bg-base);
     }
     .analysis-header {
       height: 60px;
-      background: rgba(17, 24, 39, 0.95);
-      border-bottom: 1px solid rgba(255,255,255,0.06);
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -41,8 +41,8 @@
     }
     .sidebar-section {
       width: 320px;
-      background: rgba(17, 24, 39, 0.95);
-      border-left: 1px solid rgba(255,255,255,0.06);
+      background: var(--bg-card);
+      border-left: 1px solid var(--border-color);
       padding: 20px;
       display: flex;
       flex-direction: column;
@@ -51,17 +51,17 @@
     }
     #tv-chart-container {
       flex: 1;
-      background: rgba(0,0,0,0.25);
+      background: var(--bg-surface);
       border-radius: 8px;
-      border: 1px solid rgba(255,255,255,0.04);
+      border: 1px solid var(--border-color);
       overflow: hidden;
       position: relative;
     }
     #tv-rsi-container {
       height: 120px;
-      background: rgba(0,0,0,0.25);
+      background: var(--bg-surface);
       border-radius: 8px;
-      border: 1px solid rgba(255,255,255,0.04);
+      border: 1px solid var(--border-color);
       overflow: hidden;
       position: relative;
     }
@@ -69,10 +69,10 @@
       display: flex;
       gap: 8px;
       align-items: center;
-      background: rgba(0,0,0,0.3);
+      background: var(--bg-surface);
       padding: 6px 12px;
       border-radius: 6px;
-      border: 1px solid rgba(255,255,255,0.08);
+      border: 1px solid var(--border-color);
     }
     .sidebar-header {
       font-size: 0.85rem;
@@ -82,7 +82,7 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
+      border-bottom: 1px solid var(--border-color);
       padding-bottom: 8px;
     }
     .back-btn {
@@ -95,7 +95,7 @@
       transition: color 0.2s;
     }
     .back-btn:hover {
-      color: white;
+      color: var(--text-primary);
     }
   </style>
 </head>
@@ -107,18 +107,18 @@
       <a href="/" class="back-btn"><i data-lucide="arrow-left"></i> Back to Dashboard</a>
       <div style="display: flex; align-items: center; gap: 10px; margin-left: 10px;">
         <span class="logo-icon" style="padding: 4px; border-radius: 6px;"><i data-lucide="candlestick-chart"></i></span>
-        <h2 id="symbol-header" class="monospace font-bold" style="margin: 0; font-size: 1.2rem; color: white;">--</h2>
-        <span id="mode-badge" class="badge text-xxs font-semibold" style="padding: 2px 6px; border-radius: 4px; background: rgba(59, 130, 246, 0.15); color: var(--accent-blue);">--</span>
+        <h2 id="symbol-header" class="monospace font-bold" style="margin: 0; font-size: 1.2rem; color: var(--text-primary);">--</h2>
+        <span id="mode-badge" class="badge text-xxs font-semibold" style="padding: 2px 6px; border-radius: 4px; background: var(--accent-blue-bg); color: var(--accent-blue);">--</span>
       </div>
       <div style="display: flex; align-items: center; gap: 5px; margin-left: 15px; cursor: pointer;" onclick="toggleBackendSettings()">
-        <i data-lucide="settings" style="width: 14px; height: 14px; color: rgba(255,255,255,0.6);"></i>
-        <span style="color: rgba(255,255,255,0.6); font-size: 0.8rem; font-weight: 500;">Config</span>
+        <i data-lucide="settings" style="width: 14px; height: 14px; color: var(--text-secondary);"></i>
+        <span style="color: var(--text-secondary); font-size: 0.8rem; font-weight: 500;">Config</span>
       </div>
     </div>
 
     <!-- Replay Engine Pane -->
     <div class="replay-bar">
-      <span class="monospace text-xxs" style="color: rgba(255,255,255,0.4);">REPLAY:</span>
+      <span class="monospace text-xxs" style="color: var(--text-muted);">REPLAY:</span>
       <button id="btn-replay-play" class="btn text-xs" style="padding: 4px 10px;"><i data-lucide="play" style="width:12px;height:12px;display:inline-block;vertical-align:middle;"></i> Play</button>
       <button id="btn-replay-pause" class="btn text-xs" style="padding: 4px 10px; display:none;"><i data-lucide="pause" style="width:12px;height:12px;display:inline-block;vertical-align:middle;"></i> Pause</button>
       <button id="btn-replay-back" class="btn text-xs" style="padding: 4px 10px;"><i data-lucide="skip-back" style="width:12px;height:12px;display:inline-block;vertical-align:middle;"></i> Back</button>
@@ -145,7 +145,7 @@
       <div>
         <h3 class="sidebar-header"><i data-lucide="brain"></i> AI Decision Panel</h3>
         <div class="intelligence-grid text-xs monospace" style="display: grid; grid-template-columns: 1fr; gap: 8px;">
-          <div class="flex-between"><span>Symbol:</span><b id="intel-symbol" class="text-white">--</b></div>
+          <div class="flex-between"><span>Symbol:</span><b id="intel-symbol">--</b></div>
           <div class="flex-between"><span>Current Price:</span><b id="intel-current-price">--</b></div>
           <div class="flex-between"><span>Entry Price:</span><b id="intel-entry-price">--</b></div>
           <div class="flex-between"><span>Target:</span><b id="intel-target-price">--</b></div>
@@ -158,18 +158,18 @@
         </div>
         
         <div style="margin-top: 12px;">
-          <span class="text-xxs" style="color: rgba(255,255,255,0.4); text-transform: uppercase; display: block; margin-bottom: 4px;">Agent Vote Breakdown:</span>
-          <div id="intel-agent-votes" class="text-xxs monospace" style="color: var(--text-secondary); max-height: 120px; overflow-y: auto; display: grid; grid-template-columns: 1fr; gap: 4px; border: 1px solid rgba(255,255,255,0.06); padding: 6px; border-radius: 4px; background: rgba(0,0,0,0.15);">
+          <span class="text-xxs" style="color: var(--text-muted); text-transform: uppercase; display: block; margin-bottom: 4px;">Agent Vote Breakdown:</span>
+          <div id="intel-agent-votes" class="text-xxs monospace" style="color: var(--text-secondary); max-height: 120px; overflow-y: auto; display: grid; grid-template-columns: 1fr; gap: 4px; border: 1px solid var(--border-color); padding: 6px; border-radius: 4px; background: var(--bg-surface);">
             --
           </div>
         </div>
       </div>
 
       <!-- Prediction Engine -->
-      <div style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 15px;">
+      <div style="border-top: 1px solid var(--border-color); padding-top: 15px;">
         <h3 class="sidebar-header"><i data-lucide="trending-up"></i> Prediction Engine</h3>
         <div class="intelligence-grid text-xs monospace" style="display: grid; grid-template-columns: 1fr; gap: 8px;">
-          <div class="flex-between"><span>Horizon:</span><b style="color: #a855f7;">SHORT TERM / NEXT CANDLE</b></div>
+          <div class="flex-between"><span>Horizon:</span><b style="color: var(--accent-purple);">SHORT TERM / NEXT CANDLE</b></div>
           <div class="flex-between"><span>Direction:</span><span id="pred-direction" class="badge">--</span></div>
           <div class="flex-between"><span>Probability:</span><b id="pred-probability">--</b></div>
           <div class="flex-between"><span>Expected Move:</span><b id="pred-move">--</b></div>
@@ -178,15 +178,15 @@
         </div>
         
         <div style="margin-top: 12px;">
-          <span class="text-xxs" style="color: rgba(255,255,255,0.4); text-transform: uppercase; display: block; margin-bottom: 4px;">AI Reasoning & Conditions:</span>
-          <div id="pred-reasoning" class="text-xxs monospace" style="color: var(--text-secondary); line-height: 1.4; background: rgba(0,0,0,0.15); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.06);">
+          <span class="text-xxs" style="color: var(--text-muted); text-transform: uppercase; display: block; margin-bottom: 4px;">AI Reasoning & Conditions:</span>
+          <div id="pred-reasoning" class="text-xxs monospace" style="color: var(--text-secondary); line-height: 1.4; background: var(--bg-surface); padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);">
             Loading AI reasoning registry...
           </div>
         </div>
       </div>
 
       <!-- Price Action & Structure Agent (Agent 11) -->
-      <div style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 15px;">
+      <div style="border-top: 1px solid var(--border-color); padding-top: 15px;">
         <h3 class="sidebar-header"><i data-lucide="line-chart"></i> Price Action Agent</h3>
         <div class="intelligence-grid text-xs monospace" style="display: grid; grid-template-columns: 1fr; gap: 8px;">
           <div class="flex-between"><span>Structure Score:</span><b id="pa-structure">--</b></div>
@@ -199,8 +199,8 @@
           <div class="flex-between"><span>Confidence:</span><b id="pa-confidence">--</b></div>
         </div>
         <div style="margin-top: 12px;">
-          <span class="text-xxs" style="color: rgba(255,255,255,0.4); text-transform: uppercase; display: block; margin-bottom: 4px;">PA Agent Reasoning:</span>
-          <div id="pa-reasoning" class="text-xxs monospace" style="color: var(--text-secondary); line-height: 1.4; background: rgba(0,0,0,0.15); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.06);">
+          <span class="text-xxs" style="color: var(--text-muted); text-transform: uppercase; display: block; margin-bottom: 4px;">PA Agent Reasoning:</span>
+          <div id="pa-reasoning" class="text-xxs monospace" style="color: var(--text-secondary); line-height: 1.4; background: var(--bg-surface); padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);">
             --
           </div>
         </div>

@@ -401,7 +401,7 @@ function updateUI(data) {
     const m = data.metrics;
     if (todayNetPnL && m.today) {
       todayNetPnL.innerText = '₹' + Number(m.today.netPnL || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
-      todayNetPnL.style.color = (m.today.netPnL || 0) >= 0 ? '#10b981' : '#ef4444';
+      todayNetPnL.style.color = (m.today.netPnL || 0) >= 0 ? 'var(--primary)' : 'var(--danger)';
     }
     if (todayTotalTrades && m.today) todayTotalTrades.innerText = m.today.trades !== undefined ? m.today.trades : 'N/A';
     if (todayWinRate && m.today) todayWinRate.innerText = m.today.winRate !== undefined ? Number(m.today.winRate).toFixed(1) + '%' : 'N/A';
@@ -410,7 +410,7 @@ function updateUI(data) {
 
     if (lifetimeNetPnL && m.lifetime) {
       lifetimeNetPnL.innerText = '₹' + Number(m.lifetime.netPnL || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
-      lifetimeNetPnL.style.color = (m.lifetime.netPnL || 0) >= 0 ? '#10b981' : '#ef4444';
+      lifetimeNetPnL.style.color = (m.lifetime.netPnL || 0) >= 0 ? 'var(--primary)' : 'var(--danger)';
     }
     if (lifetimeTotalTrades && m.lifetime) lifetimeTotalTrades.innerText = m.lifetime.trades !== undefined ? m.lifetime.trades : 'N/A';
     if (lifetimeWinRate && m.lifetime) lifetimeWinRate.innerText = m.lifetime.winRate !== undefined ? Number(m.lifetime.winRate).toFixed(1) + '%' : 'N/A';
@@ -1130,22 +1130,22 @@ function initChart() {
   const chartOptions = {
     layout: {
       background: { type: 'solid', color: 'transparent' },
-      textColor: '#94a3b8',
+      textColor: '#5E696E',
     },
     grid: {
-      vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
-      horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
+      vertLines: { color: 'rgba(0, 0, 0, 0.03)' },
+      horzLines: { color: 'rgba(0, 0, 0, 0.03)' },
     },
     crosshair: {
       mode: 0,
     },
     timeScale: {
-      borderColor: 'rgba(255, 255, 255, 0.08)',
+      borderColor: 'rgba(0, 0, 0, 0.08)',
       timeVisible: true,
       secondsVisible: false,
     },
     rightPriceScale: {
-      borderColor: 'rgba(255, 255, 255, 0.08)',
+      borderColor: 'rgba(0, 0, 0, 0.08)',
     }
   };
 
@@ -1156,11 +1156,11 @@ function initChart() {
   });
 
   candlestickSeries = mainChart.addCandlestickSeries({
-    upColor: '#10b981',
-    downColor: '#ef4444',
+    upColor: '#94B692',
+    downColor: '#D59DA4',
     borderVisible: false,
-    wickUpColor: '#10b981',
-    wickDownColor: '#ef4444',
+    wickUpColor: '#94B692',
+    wickDownColor: '#D59DA4',
   });
 
   volumeSeries = mainChart.addHistogramSeries({
@@ -1219,7 +1219,7 @@ function initChart() {
   });
 
   currentPriceSeries = mainChart.addLineSeries({
-    color: '#94a3b8',
+    color: '#5E696E',
     lineWidth: 1,
     lineStyle: 3,
     title: 'LTP',
@@ -1232,15 +1232,15 @@ function initChart() {
   });
 
   rsiSeries = rsiChart.addLineSeries({
-    color: '#a855f7',
+    color: '#BCA6C4',
     lineWidth: 1.5,
     title: 'RSI',
   });
 
   // RSI limit lines
-  const rsi30Line = rsiChart.addLineSeries({ color: 'rgba(255,255,255,0.06)', lineWidth: 1, lineStyle: 1 });
-  const rsi50Line = rsiChart.addLineSeries({ color: 'rgba(255,255,255,0.04)', lineWidth: 1, lineStyle: 1 });
-  const rsi70Line = rsiChart.addLineSeries({ color: 'rgba(255,255,255,0.06)', lineWidth: 1, lineStyle: 1 });
+  const rsi30Line = rsiChart.addLineSeries({ color: 'rgba(0,0,0,0.06)', lineWidth: 1, lineStyle: 1 });
+  const rsi50Line = rsiChart.addLineSeries({ color: 'rgba(0,0,0,0.04)', lineWidth: 1, lineStyle: 1 });
+  const rsi70Line = rsiChart.addLineSeries({ color: 'rgba(0,0,0,0.06)', lineWidth: 1, lineStyle: 1 });
 
   const startSecs = Math.floor(Date.now() / 1000) - 200 * 300;
   rsi30Line.setData(Array.from({ length: 300 }).map((_, i) => ({ time: startSecs + i * 300, value: 30 })));

@@ -66,18 +66,18 @@ function initChart() {
   const chartOptions = {
     layout: {
       background: { type: 'solid', color: 'transparent' },
-      textColor: '#94a3b8',
+      textColor: '#5E696E',
     },
     grid: {
-      vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
-      horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
+      vertLines: { color: 'rgba(0, 0, 0, 0.03)' },
+      horzLines: { color: 'rgba(0, 0, 0, 0.03)' },
     },
     crosshair: { mode: 0 },
     timeScale: {
-      borderColor: 'rgba(255, 255, 255, 0.08)',
+      borderColor: 'rgba(0, 0, 0, 0.08)',
       timeVisible: true,
     },
-    rightPriceScale: { borderColor: 'rgba(255, 255, 255, 0.08)' }
+    rightPriceScale: { borderColor: 'rgba(0, 0, 0, 0.08)' }
   };
 
   const containerWidth = chartContainer.clientWidth || 800;
@@ -95,24 +95,24 @@ function initChart() {
   }
 
   candlestickSeries = liveAnalysisChart.addCandlestickSeries({
-    upColor: '#10b981', downColor: '#ef4444',
-    borderVisible: false, wickUpColor: '#10b981', wickDownColor: '#ef4444',
+    upColor: '#94B692', downColor: '#D59DA4',
+    borderVisible: false, wickUpColor: '#94B692', wickDownColor: '#D59DA4',
   });
   console.log('candlestickSeries created successfully:', !!candlestickSeries);
 
   volumeSeries = liveAnalysisChart.addHistogramSeries({
-    color: 'rgba(59, 130, 246, 0.3)', priceFormat: { type: 'volume' }, priceScaleId: '',
+    color: 'rgba(155, 184, 205, 0.3)', priceFormat: { type: 'volume' }, priceScaleId: '',
   });
   volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.7, bottom: 0 } });
 
-  ema9Series = liveAnalysisChart.addLineSeries({ color: '#3b82f6', lineWidth: 1.5, title: 'EMA 9' });
-  ema21Series = liveAnalysisChart.addLineSeries({ color: '#f59e0b', lineWidth: 1.5, title: 'EMA 21' });
-  supportSeries = liveAnalysisChart.addLineSeries({ color: 'rgba(16, 185, 129, 0.4)', lineWidth: 1.5, lineStyle: 1, title: 'Support' });
-  resistanceSeries = liveAnalysisChart.addLineSeries({ color: 'rgba(239, 68, 68, 0.4)', lineWidth: 1.5, lineStyle: 1, title: 'Resistance' });
-  vwapSeries = liveAnalysisChart.addLineSeries({ color: '#06b6d4', lineWidth: 1.5, title: 'VWAP' });
-  stopLossSeries = liveAnalysisChart.addLineSeries({ color: '#ef4444', lineWidth: 1.5, lineStyle: 2, title: 'Stop Loss' });
-  targetSeries = liveAnalysisChart.addLineSeries({ color: '#10b981', lineWidth: 1.5, lineStyle: 2, title: 'Target' });
-  currentPriceSeries = liveAnalysisChart.addLineSeries({ color: '#94a3b8', lineWidth: 1, lineStyle: 3, title: 'LTP' });
+  ema9Series = liveAnalysisChart.addLineSeries({ color: '#9BB8CD', lineWidth: 1.5, title: 'EMA 9' });
+  ema21Series = liveAnalysisChart.addLineSeries({ color: '#DFCA8D', lineWidth: 1.5, title: 'EMA 21' });
+  supportSeries = liveAnalysisChart.addLineSeries({ color: 'rgba(148, 182, 146, 0.6)', lineWidth: 1.5, lineStyle: 1, title: 'Support' });
+  resistanceSeries = liveAnalysisChart.addLineSeries({ color: 'rgba(213, 157, 164, 0.6)', lineWidth: 1.5, lineStyle: 1, title: 'Resistance' });
+  vwapSeries = liveAnalysisChart.addLineSeries({ color: '#BCA6C4', lineWidth: 1.5, title: 'VWAP' });
+  stopLossSeries = liveAnalysisChart.addLineSeries({ color: '#D59DA4', lineWidth: 1.5, lineStyle: 2, title: 'Stop Loss' });
+  targetSeries = liveAnalysisChart.addLineSeries({ color: '#94B692', lineWidth: 1.5, lineStyle: 2, title: 'Target' });
+  currentPriceSeries = liveAnalysisChart.addLineSeries({ color: '#5E696E', lineWidth: 1, lineStyle: 3, title: 'LTP' });
 
   const rsiWidth = rsiContainer.clientWidth || 800;
   const rsiHeight = rsiContainer.clientHeight || 120;
@@ -124,11 +124,11 @@ function initChart() {
     height: rsiHeight,
   });
 
-  rsiSeries = rsiAnalysisChart.addLineSeries({ color: '#a855f7', lineWidth: 1.5, title: 'RSI' });
+  rsiSeries = rsiAnalysisChart.addLineSeries({ color: '#BCA6C4', lineWidth: 1.5, title: 'RSI' });
 
-  const rsi30Line = rsiAnalysisChart.addLineSeries({ color: 'rgba(255,255,255,0.06)', lineWidth: 1, lineStyle: 1 });
-  const rsi50Line = rsiAnalysisChart.addLineSeries({ color: 'rgba(255,255,255,0.04)', lineWidth: 1, lineStyle: 1 });
-  const rsi70Line = rsiAnalysisChart.addLineSeries({ color: 'rgba(255,255,255,0.06)', lineWidth: 1, lineStyle: 1 });
+  const rsi30Line = rsiAnalysisChart.addLineSeries({ color: 'rgba(0, 0, 0, 0.06)', lineWidth: 1, lineStyle: 1 });
+  const rsi50Line = rsiAnalysisChart.addLineSeries({ color: 'rgba(0, 0, 0, 0.04)', lineWidth: 1, lineStyle: 1 });
+  const rsi70Line = rsiAnalysisChart.addLineSeries({ color: 'rgba(0, 0, 0, 0.06)', lineWidth: 1, lineStyle: 1 });
 
   const startSecs = Math.floor(Date.now() / 1000) - 200 * 300;
   rsi30Line.setData(Array.from({ length: 300 }).map((_, i) => ({ time: startSecs + i * 300, value: 30 })));

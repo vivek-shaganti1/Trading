@@ -1,31 +1,32 @@
-/* AGY-TRADER Institutional Dark Theme Variables */
+/* AGY-TRADER Powdered Pastels Neat & Clean Light Theme Variables */
 :root {
   --font-family: 'Outfit', 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   
-  --bg-base: #06090e;
-  --bg-surface: #0b0e14;
-  --bg-card: #11151d;
-  --border-color: rgba(255, 255, 255, 0.05);
-  --border-hover: rgba(255, 255, 255, 0.1);
+  /* Pantone Powdered Pastels Palette */
+  --bg-base: #F0EEE9;        /* Cloud Dancer - clean soft linen background */
+  --bg-surface: #FAF9F6;     /* Pure soft alabaster for main layouts */
+  --bg-card: #FFFFFF;        /* Crisp white for cards to pop out */
+  --border-color: #E2E1DC;    /* Soft cloud dancer outline */
+  --border-hover: #D7D9DB;    /* Nimbus Cloud border on hover */
   
   /* Color Accents (HSL Tailored) */
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #475569;
+  --text-primary: #2C3539;    /* Dark Charcoal for highly readable text */
+  --text-secondary: #5E696E;  /* Muted slate for labels and descriptions */
+  --text-muted: #8E9A9F;      /* Lighter gray for helper details */
   
-  --primary: #10b981;        /* Emerald Green for Profit/Open/Active */
-  --primary-bg: rgba(16, 185, 129, 0.1);
-  --danger: #ef4444;         /* Crimson Red for Losses/Stops/Errors */
-  --danger-bg: rgba(239, 68, 68, 0.1);
-  --warning: #f59e0b;        /* Amber for Consensus/Halt/Warnings */
-  --warning-bg: rgba(245, 158, 11, 0.1);
-  --accent-blue: #3b82f6;    /* Royal Blue for System/Info */
-  --accent-blue-bg: rgba(59, 130, 246, 0.1);
-  --accent-purple: #8b5cf6;  /* Purple for AI Decisions/Debates */
-  --accent-purple-bg: rgba(139, 92, 246, 0.1);
+  --primary: #94B692;        /* Almost Aqua sage green for active/profit state */
+  --primary-bg: #E4EFE3;     /* Light Almost Aqua tint background */
+  --danger: #D59DA4;         /* Rose Pink (Raindrops on Roses) for loss/stop-loss */
+  --danger-bg: #F6EBEC;      /* Light Raindrops on Roses tint background */
+  --warning: #DFCA8D;        /* Lemon Icing yellow for warning/cooldowns */
+  --warning-bg: #FAF5E6;     /* Light Lemon Icing tint background */
+  --accent-blue: #9BB8CD;    /* Ice Melt blue for system log/diagnostics */
+  --accent-blue-bg: #EBF1F5; /* Light Ice Melt tint background */
+  --accent-purple: #BCA6C4;  /* Orchid Tint lavender for AI consensus */
+  --accent-purple-bg: #F4EFF6;/* Light Orchid Tint background */
   
-  --glass-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.6);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.04);
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -55,11 +56,11 @@ body {
   background: var(--bg-base);
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: var(--border-hover);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: var(--text-muted);
 }
 
 .monospace {
@@ -126,7 +127,7 @@ body {
   font-size: 1.15rem;
   font-weight: 800;
   letter-spacing: 0.5px;
-  background: linear-gradient(135deg, #f8fafc 30%, #94a3b8 100%);
+  background: linear-gradient(135deg, #2C3539 30%, #5E696E 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -196,7 +197,7 @@ body {
 }
 
 .time-box {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-card);
   border: 1px solid var(--border-color);
   padding: 6px 12px;
   border-radius: 8px;
@@ -227,7 +228,7 @@ body {
 
 /* Institutional Card Design */
 .card {
-  background-color: var(--bg-surface);
+  background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   padding: 16px;
@@ -289,17 +290,17 @@ body {
 
 .btn-primary {
   background-color: var(--primary);
-  color: var(--bg-base);
+  color: var(--text-primary);
 }
 
 .btn-primary:hover {
-  background-color: #059669;
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.2);
+  background-color: var(--border-hover);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 /* Tab controls */
 .metrics-tabs {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.04);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 3px;
@@ -320,8 +321,9 @@ body {
 }
 
 .tab-btn.active, .tab-btn-diag.active {
-  background-color: #1e293b;
+  background-color: var(--bg-card);
   color: var(--text-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 /* Mini Statistics display */
@@ -386,7 +388,7 @@ body {
 
 /* Tickers style */
 .ticker-box {
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--bg-surface);
   border: 1px solid var(--border-color);
   padding: 6px 10px;
   border-radius: 6px;
@@ -407,8 +409,8 @@ body {
 }
 
 .primary-ticker {
-  background: rgba(59, 130, 246, 0.06);
-  border-color: rgba(59, 130, 246, 0.15);
+  background: var(--accent-blue-bg);
+  border-color: var(--accent-blue);
 }
 
 /* Timeline Horizontal (Phase 8) */
@@ -481,7 +483,7 @@ body {
 }
 
 .console-log-stream {
-  background-color: #030508;
+  background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   height: 250px;
@@ -499,13 +501,13 @@ body {
   gap: 12px;
   padding: 4px 6px;
   border-radius: 4px;
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.02);
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.04);
   align-items: flex-start;
   transition: var(--transition);
 }
 
 .log-entry:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(0, 0, 0, 0.02);
 }
 
 .log-time {
@@ -515,14 +517,14 @@ body {
 }
 
 .log-source {
-  color: var(--accent-blue);
+  color: var(--text-primary);
   width: 120px;
   font-weight: 700;
   flex-shrink: 0;
 }
 
 .log-symbol {
-  color: #fff;
+  color: var(--text-primary);
   width: 80px;
   font-weight: 700;
   flex-shrink: 0;
@@ -560,7 +562,7 @@ body {
 
 /* Why trade explainer (Phase 2) */
 .pill {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(0, 0, 0, 0.03);
   border: 1px solid var(--border-color);
   padding: 3px 8px;
   border-radius: 4px;
@@ -579,7 +581,7 @@ body {
   justify-content: space-between;
   padding: 6px;
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.02);
   border: 1px solid var(--border-color);
   font-size: 0.72rem;
 }
@@ -602,7 +604,7 @@ body {
 .funnel-stage-row {
   display: flex;
   align-items: center;
-  background: rgba(0,0,0,0.2);
+  background: rgba(0, 0, 0, 0.02);
   border: 1px solid var(--border-color);
   padding: 6px 12px;
   border-radius: 8px;
@@ -611,8 +613,8 @@ body {
 }
 
 .funnel-stage-row:hover {
-  background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.04);
+  border-color: var(--border-hover);
 }
 
 .funnel-label {
@@ -631,7 +633,7 @@ body {
 
 .funnel-bar-wrapper {
   width: 100px;
-  background: rgba(255,255,255,0.03);
+  background: rgba(0, 0, 0, 0.05);
   height: 6px;
   border-radius: 3px;
   margin: 0 16px;
@@ -661,7 +663,7 @@ body {
 
 /* Active position progress tracker (Phase 4) */
 .active-position-card {
-  background: rgba(0,0,0,0.15);
+  background: rgba(0, 0, 0, 0.02);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 10px;
@@ -703,7 +705,7 @@ body {
 
 .diagnostic-table td {
   padding: 6px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.02);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
   font-size: 0.72rem;
 }
 
@@ -716,11 +718,11 @@ body {
 
 /* Agent performance styling */
 .agent-profitable {
-  background: rgba(16, 185, 129, 0.02);
+  background: rgba(148, 182, 146, 0.08);
 }
 
 .agent-losing {
-  background: rgba(239, 68, 68, 0.02);
+  background: rgba(213, 157, 164, 0.08);
 }
 
 /* Modals */
@@ -732,7 +734,7 @@ body {
   top: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0,0,0,0.7);
+  background-color: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(4px);
   align-items: center;
   justify-content: center;
@@ -743,7 +745,7 @@ body {
 }
 
 .modal-content {
-  background-color: var(--bg-surface);
+  background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   width: 90%;
@@ -790,7 +792,7 @@ body {
 
 .hist-bar-outer {
   flex: 1;
-  background: rgba(255,255,255,0.03);
+  background: rgba(0, 0, 0, 0.05);
   height: 6px;
   border-radius: 3px;
   overflow: hidden;
