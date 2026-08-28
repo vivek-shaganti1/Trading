@@ -3,7 +3,7 @@ const broker = require('./broker');
 const alerts = require('./alerts');
 const config = require('../shared/config');
 const predictor = require('./predictor');
-const marketScanner = require('../scratch/market_scanner');
+const marketScanner = require('./marketScanner');
 const agent17_execution = require('./agent17_execution');
 const dynamicThreshold = require('./dynamicThreshold');
 const agentResearch = require('./agentResearch');
@@ -12,6 +12,13 @@ const runtimeState = require('./runtimeState');
 const volumeIntelligenceAgent = require('./volumeIntelligenceAgent');
 const exitIntelligenceEngine = require('./exitIntelligenceEngine');
 const fsm = require('./lifecycleFSM');
+const riskEngine = require('./riskEngine');
+const sessionAnnouncer = require('./sessionAnnouncer');
+
+// Wall-clock baseline for "time since X" alerts. Without this, one-shot alerts
+// measure elapsed time from the market open even on a mid-session restart, so a
+// fresh process instantly fires "no signals for 10 minutes".
+const PROCESS_START_MS = Date.now();
 
 
 const pendingExecutions = new Set();
@@ -254,11 +261,13 @@ function logSuppressionDiagnostics(item, prediction, tqs, requiredThreshold, rej
 const tradingBot = {
   _setMockTime(timeObj) {
     mockTime = timeObj;
+    global.mockTime = timeObj;
   },
 
   _resetLocalState() {
     currentDayStats = null;
     mockTime = null;
+    global.mockTime = null;
     scanTimer = 0;
     consecutiveLossesCount = 0;
     lastStatusSentMins = -1;
@@ -446,6 +455,24 @@ const tradingBot = {
     this.addTimeline('09:05', 'Systems Ready');
     
     console.log(`[PRE-MARKET] Warmup completed. Readiness Score: ${preMarketState.readinessScore}%`);
+
+    // Tell the operator the day has begun. Previously the entire 09:00 warmup
+    // was console-only, so the first sign of life was a 09:05 watchlist notice
+    // that itself required a tick to land on an exact second.
+    try {
+      await alerts.sendTelegram(
+        `🌅 <b>PRE-MARKET STARTED — 09:00 IST</b>\n` +
+        `Warming up for today's session. Market opens at 09:15.\n\n` +
+        `<b>Readiness:</b> ${preMarketState.readinessScore}%\n` +
+        `<b>Database:</b> ${preMarketState.database || 'checking'}   ` +
+        `<b>Broker:</b> ${preMarketState.broker || 'checking'}\n\n` +
+        (preMarketState.readinessScore < 100
+          ? `⚠️ Not every check is green. Trading will still start — watch for follow-ups.`
+          : `All systems green. You'll get a confirmation when trading goes live.`)
+      );
+    } catch (e) {
+      console.error('[PRE-MARKET] Announcement failed:', e.message);
+    }
   },
 
   async runFinalPreMarketChecks() {
@@ -488,9 +515,23 @@ const tradingBot = {
     
     if (currentMins <= 9 * 60 + 16) {
       await this.printReadinessReport();
+      // The readiness report is named after the phase that just ENDED and never
+      // says trading is now live. This is the positive confirmation the operator
+      // was missing entirely.
+      try {
+        const v = await broker.getValuation();
+        await sessionAnnouncer.announceMarketOpen({
+          capital: v.totalVal,
+          dailyTarget: currentDayStats && currentDayStats.daily_target,
+          universeSize: marketScanner.getUniverseSize ? marketScanner.getUniverseSize() : null,
+          brokerMode: config.BROKER_MODE
+        });
+      } catch (e) {
+        console.error('[MARKET OPEN] Announcement failed:', e.message);
+      }
     } else {
       console.log(`[MID-SESSION RECOVERY] Bypassing Premarket Readiness Report at ${timeInfo.hours}:${timeInfo.minutes}`);
-      await alerts.sendTelegram(`🔄 <b>MID-SESSION RECOVERY</b>\nEngine restarted at ${timeInfo.hours}:${timeInfo.minutes} IST.\nAuto-resuming scanning and execution.`);
+      await alerts.sendTelegram(`🔄 <b>MID-SESSION RECOVERY</b>\nEngine restarted at ${String(timeInfo.hours).padStart(2, '0')}:${String(timeInfo.minutes).padStart(2, '0')} IST.\nAuto-resuming scanning and execution.`);
     }
     
     // Auto start active scanning immediately
@@ -897,16 +938,31 @@ const tradingBot = {
       preMarketState.readinessScore = Math.min(90, preMarketState.readinessScore);
     }
 
-    const scannerStats = marketScanner.getScannerStats ? marketScanner.getScannerStats() : {
-      currentScan: 0,
-      currentSession: 0,
-      today: 0,
-      lifetime: 0,
-      lastScanTime: 'None',
-      currentSymbol: 'Idle',
-      symbolsPerMin: 0,
-      avgScanTimeMs: 0
+    // The scanner exposes getMetrics(), NOT getScannerStats(). The old
+    // "if the method exists" ternary therefore ALWAYS took the fallback, so the
+    // entire Scanner diagnostics tab read 0 / 0 / 0 / Idle while the scanner was
+    // actively sweeping ~5,000 symbols. Key names differ too, so they are mapped.
+    let scannerStats = {
+      currentScan: 0, currentSession: 0, today: 0, lifetime: 0,
+      lastScanTime: 'None', currentSymbol: 'Idle', symbolsPerMin: 0, avgScanTimeMs: 0
     };
+    try {
+      const m = typeof marketScanner.getMetrics === 'function' ? marketScanner.getMetrics() : null;
+      if (m) {
+        scannerStats = {
+          currentScan: m.currentScanCount || 0,
+          currentSession: m.sessionTotalScanned || 0,
+          today: m.sessionTotalScanned || 0,
+          lifetime: (db.readLocalDb().lifetime_scanned_count) || m.sessionTotalScanned || 0,
+          lastScanTime: m.lastScanTime || 'None',
+          currentSymbol: m.currentSymbol || 'Idle',
+          symbolsPerMin: Math.round(m.symbolsPerMin || 0),
+          avgScanTimeMs: Math.round(m.avgScanTimeMs || 0)
+        };
+      }
+    } catch (e) {
+      console.error('[STATUS] Scanner metrics unavailable:', e.message);
+    }
 
     let tgStatus = 'OFFLINE';
     try {
@@ -1429,10 +1485,11 @@ const tradingBot = {
     }
   },
   async tick() {
-    if (entriesPaused) {
-       console.log(`[SCHEDULER TRACE] tick() paused by user.`);
-       return;
-    }
+    // NOTE: entriesPaused must NOT short-circuit the whole tick. It previously
+    // returned here, which also disabled stop-loss/target monitoring, the FSM
+    // clock and end-of-day processing - so "/stop" left open positions
+    // completely unmanaged. It now gates only the entry path (see
+    // processScannerRankings), while exits and risk checks keep running.
     const fsmResult = fsm.evaluateTransitions();
     const state = fsmResult.state;
     const s = fsmResult.sessionDetails;
@@ -1553,6 +1610,37 @@ const tradingBot = {
       return;
     }
 
+    // ---------------------------------------------------------------------
+    // END-OF-DAY SQUARE-OFF — must run BEFORE the SCANNING/TRADING gate below.
+    //
+    // This block previously lived ~250 lines further down, guarded by
+    // `state === 'MARKET_CLOSING'`. Because the gate below returns for every
+    // state except SCANNING/TRADING, and MARKET_CLOSING is exactly one of the
+    // states it rejects, the square-off was unreachable: it never ran once.
+    // Positions carried overnight with no stop monitoring.
+    //
+    // It now fires at AUTO_SQUAREOFF_TIME (15:15 IST) — deliberately ahead of
+    // the exchange/broker auto-square-off window so that we control the exit
+    // rather than being force-closed at whatever price the broker gets.
+    // ---------------------------------------------------------------------
+    const squareOffMins = config.AUTO_SQUAREOFF_TIME.hour * 60 + config.AUTO_SQUAREOFF_TIME.minute;
+    if (s.isOpen && currentMins >= squareOffMins && !preMarketState.eodSquareOffAlerted) {
+      preMarketState.eodSquareOffAlerted = true;
+      await this.runEodSquareOff(timeInfo);
+    }
+
+    // Stop-loss / target monitoring must continue through MARKET_CLOSING.
+    // Previously exits were only evaluated in SCANNING/TRADING, so the final
+    // five minutes of the session — the most volatile window of the day — went
+    // completely unmonitored.
+    if (s.isOpen && state !== 'SCANNING' && state !== 'TRADING') {
+      try {
+        await this.processRealExits();
+      } catch (e) {
+        console.error('[BOT] Exit monitoring failed during closing window:', e.message);
+      }
+    }
+
     if (state !== 'SCANNING' && state !== 'TRADING') {
        fsm.printSchedulerBlock('Outside of Active Scanning/Trading Session', s);
        return;
@@ -1596,12 +1684,12 @@ const tradingBot = {
         const startCapital = portfolio.balance + portfolio.equity_value;
         const riskMode = portfolio.user_instructions?.risk_mode || 'NORMAL';
         const riskPerTrade = (runtimeState && runtimeState.getSnapshot().settings.risk_per_trade_percent) || 1.0;
-      const cap = (typeof valuation !== 'undefined' ? valuation.totalVal : (typeof startCapital !== 'undefined' ? startCapital : 12000));
-      const avgRR = 2.5; 
-      const winRate = 0.62;
-      const dailyTrades = 7;
-      const expectedProfitPerTrade = (cap * (riskPerTrade / 100)) * ((avgRR * winRate) - (1 - winRate));
-      const calculatedTarget = Math.max(100.0, parseFloat((expectedProfitPerTrade * dailyTrades).toFixed(2)));
+        const cap = (typeof startCapital !== 'undefined' && startCapital > 0 ? startCapital : 12000);
+        const avgRR = 2.5; 
+        const winRate = 0.62;
+        const dailyTrades = 7;
+        const expectedProfitPerTrade = (cap * (riskPerTrade / 100)) * ((avgRR * winRate) - (1 - winRate));
+        const calculatedTarget = Math.max(100.0, parseFloat((expectedProfitPerTrade * dailyTrades).toFixed(2)));
       
       if (runtimeState && runtimeState.targetEngineState) {
         runtimeState.targetEngineState = {
@@ -1811,19 +1899,119 @@ const tradingBot = {
       }
     }
 
-    // EOD Square Off Trigger
-    if (state === 'MARKET_CLOSING' && currentMins >= 15 * 60 + 30 && currentMins < 15 * 60 + 35) {
-      if (!preMarketState.eodSquareOffAlerted) {
-        preMarketState.eodSquareOffAlerted = true;
-        console.log('[SCHEDULER] 15:30 IST - EOD Square Off sequence initiated...');
-        await alerts.sendTelegram('⏰ <b>15:30 EOD Square Off:</b> Liquidating all active day trading positions.');
-        const activeHoldings = portfolio.holding_stocks || [];
-        try {
-          await riskEngine.triggerEmergencySquareOff(broker, activeHoldings);
-        } catch (e) {
-          console.error('[EOD SQUARE OFF] Error during liquidation:', e.message);
-        }
+    // (EOD square-off relocated above the SCANNING/TRADING gate — it was
+    //  unreachable here. See runEodSquareOff().)
+  },
+
+  /**
+   * Liquidate every open intraday position at the configured square-off time.
+   *
+   * Runs ahead of the broker's own auto-square-off so we choose the exit rather
+   * than being force-closed. Reconciles afterwards and refuses to report success
+   * unless the book is genuinely flat.
+   */
+  /**
+   * End-of-day close notice. Called by the 15:30 cron BEFORE stop(), because
+   * stop() clears the tick interval and the FSM's EOD window (15:35-15:40) is
+   * then unreachable. Explicitly explains a zero-trade day, which is the case
+   * that previously produced total silence.
+   */
+  async announceSessionClose() {
+    try {
+      const s = fsm.getTradingSession();
+      if (s.isHoliday || s.isWeekend) return false;   // nothing to close
+
+      const valuation = await broker.getValuation().catch(() => null);
+      const dbData = db.readLocalDb();
+      const today = fsm.getSystemTime().dateStr;
+      const todaysTrades = (dbData.trade_logs || []).filter(t =>
+        String(t.timestamp || '').slice(0, 10) === today);
+      const closed = (dbData.completed_trades || []).filter(t =>
+        String(t.exit_time || '').slice(0, 10) === today);
+
+      // Most common reason candidates were blocked, straight from the
+      // suppression diagnostics the engine already records.
+      let topReason = null;
+      try {
+        const counts = {};
+        (signalSuppressionState.detailedRejections || []).forEach(r => {
+          const k = String(r.rejectionReason || '').replace(/[0-9.]+/g, 'N');
+          counts[k] = (counts[k] || 0) + 1;
+        });
+        const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+        if (best) topReason = best[0];
+      } catch (e) {}
+
+      return await sessionAnnouncer.announceClose({
+        tradesClosed: closed.length,
+        netPnL: currentDayStats ? currentDayStats.net_pnl : 0,
+        portfolioValue: valuation ? valuation.totalVal : 0,
+        openPositions: valuation && valuation.holdingStocks ? valuation.holdingStocks.length : 0,
+        candidatesScanned: signalSuppressionState.totalCandidates || 0,
+        candidatesPassed: todaysTrades.length,
+        topRejectionReason: topReason
+      });
+    } catch (e) {
+      console.error('[SESSION CLOSE] Announcement failed:', e.message);
+      return false;
+    }
+  },
+
+  async runEodSquareOff(timeInfo) {
+    const stamp = `${String(timeInfo.hours).padStart(2, '0')}:${String(timeInfo.minutes).padStart(2, '0')}`;
+    console.log(`[SCHEDULER] ${stamp} IST - EOD square-off sequence initiated...`);
+
+    let activeHoldings = [];
+    try {
+      const portfolioState = await db.getPortfolioState();
+      activeHoldings = portfolioState.holding_stocks || [];
+    } catch (e) {
+      console.error('[EOD SQUARE OFF] Could not read portfolio:', e.message);
+      return;
+    }
+
+    if (activeHoldings.length === 0) {
+      console.log('[EOD SQUARE OFF] Book already flat — nothing to liquidate.');
+      return;
+    }
+
+    // Block any new entry for the remainder of the session before selling, so
+    // the scanner cannot re-open a position we are in the middle of closing.
+    entriesPaused = true;
+
+    await alerts.sendTelegram(
+      `⏰ <b>${stamp} EOD SQUARE-OFF</b>\nLiquidating ${activeHoldings.length} open position(s).`
+    );
+
+    let result;
+    try {
+      result = await riskEngine.triggerEmergencySquareOff(broker, activeHoldings);
+    } catch (e) {
+      console.error('[EOD SQUARE OFF] Liquidation error:', e.message);
+      result = { success: false, sold: [], unsold: activeHoldings.map(h => h.symbol) };
+    }
+
+    // Book the realised P&L for everything that actually sold.
+    for (const symbol of (result.sold || [])) {
+      try {
+        const held = activeHoldings.find(h => h.symbol === symbol);
+        if (!held) continue;
+        const exitPrice = broker.getLTP(symbol) || held.avgPrice;
+        await db.matchBuyAndCreateCompletedTrade(
+          symbol, exitPrice, held.quantity, new Date().toISOString(), 'EOD square-off'
+        );
+        await predictor.recordPredictionExit(
+          symbol, exitPrice, (exitPrice - held.avgPrice) * held.quantity, held
+        );
+      } catch (e) {
+        console.error(`[EOD SQUARE OFF] Post-exit bookkeeping failed for ${symbol}:`, e.message);
       }
+    }
+
+    if (!result.success) {
+      console.error(`[EOD SQUARE OFF] INCOMPLETE — still holding: ${(result.unsold || []).join(', ')}`);
+    } else {
+      console.log(`[EOD SQUARE OFF] Complete. ${(result.sold || []).length} position(s) closed.`);
     }
   },
 
@@ -1854,7 +2042,13 @@ const tradingBot = {
       entry_cooldown: 0,
       below_tqs_threshold: 0,
       insufficient_capital: 0,
-      portfolio_replacement_failed: 0
+      portfolio_replacement_failed: 0,
+      // These two accounted for essentially every lost candidate and had NO
+      // counter at all, which is why every pipeline log read
+      // "stage4_consensus: 0" with all five rejection reasons at zero - a
+      // funnel that reported nothing was wrong while nothing was working.
+      consensus_deadlock: 0,
+      prediction_error: 0
     };
 
     const portfolio = await db.getPortfolioState();
@@ -1940,10 +2134,25 @@ const tradingBot = {
             expectancy: prediction.expectancyBeforeTrade || 0
           });
         } else {
-          await this.logOpportunityInTracker(item, prediction, tqs, 'REJECTED', 'Consensus deadlock');
+          rejectionReasons.consensus_deadlock++;
+          // prediction.rejectionReason already holds the actual gate that fired
+          // (e.g. "Signal direction is neutral (HOLD)"). The generic
+          // "Consensus deadlock" string threw that diagnosis away.
+          const realReason = prediction.rejectionReason || 'Consensus deadlock';
+          await this.logOpportunityInTracker(item, prediction, tqs, 'REJECTED', realReason);
         }
       } catch (err) {
+        // A throw here (delisted symbol, market-data failure) previously left
+        // NO trace: no counter, no tracker row. stage3 had already been
+        // incremented, so the candidate simply evaporated between stages.
+        rejectionReasons.prediction_error++;
         console.error(`[PORTFOLIO] Error running prediction for ${item.symbol}:`, err.message);
+        try {
+          await this.logOpportunityInTracker(
+            item, { signal: 'ERROR', confidence: 0 }, 0, 'REJECTED',
+            `Prediction error: ${err.message}`.slice(0, 180)
+          );
+        } catch (e) { /* tracker is best-effort */ }
       }
     }
 
@@ -2019,8 +2228,11 @@ const tradingBot = {
         let replaced = false;
         for (let idx = 0; idx < activePositions.length; idx++) {
           const pos = activePositions[idx];
-          const currentPrice = broker.getLTP(pos.symbol) || pos.entry_price;
-          const unrealizedPnL = (currentPrice - pos.entry_price) * pos.quantity;
+          // Holdings are written by broker.executeOrder with 'avgPrice'; there is
+          // no 'entry_price' field. Reading it yielded NaN, and NaN <= 0 is
+          // false, so this replacement exit could never fire.
+          const currentPrice = broker.getLTP(pos.symbol) || pos.avgPrice;
+          const unrealizedPnL = (currentPrice - pos.avgPrice) * pos.quantity;
           const originalTQS = pos.tqs || 65;
 
           // Replace if current position is losing and new candidate has >= 15 points higher TQS
@@ -2395,7 +2607,7 @@ const tradingBot = {
     console.log(`• Candidates (S3): ${stage3CandidatesCount} symbols (${pct3}%)`);
     console.log(`• Consensus (S4):  ${stage4ConsensusCount} symbols (${pct4}%)`);
     console.log(`• Executed (S5):   ${stage5ExecutedCount} symbols (${pct5}%)`);
-    console.log(`• Rejection Reasons: Already Held: ${rejectionReasons.already_held} | Entry Cooldown: ${rejectionReasons.entry_cooldown} | Below Threshold: ${rejectionReasons.below_tqs_threshold} | Insufficient Capital: ${rejectionReasons.insufficient_capital} | Portfolio Replace Failed: ${rejectionReasons.portfolio_replacement_failed}`);
+    console.log(`• Rejection Reasons: Already Held: ${rejectionReasons.already_held} | Entry Cooldown: ${rejectionReasons.entry_cooldown} | Below Threshold: ${rejectionReasons.below_tqs_threshold} | Insufficient Capital: ${rejectionReasons.insufficient_capital} | Portfolio Replace Failed: ${rejectionReasons.portfolio_replacement_failed} | Consensus Deadlock: ${rejectionReasons.consensus_deadlock} | Prediction Error: ${rejectionReasons.prediction_error}`);
 
     // Phase 4 Funnel validation check
     if (!(totalScannedCount >= stage1ResearchCount &&

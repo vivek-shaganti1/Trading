@@ -31,9 +31,39 @@ function detectSwings(candles, leftStrength = 2, rightStrength = 2) {
   return { highs, lows };
 }
 
+// Rolling-window structure: split the window into halves and compare extremes.
+// This still classifies a trend when no pivot satisfies the strict swing test
+// (a monotonic advance has zero qualifying pivots, which previously scored 50).
+function windowStructureBias(candles) {
+  const n = candles.length;
+  if (n < 10) return 0;
+  const mid = Math.floor(n / 2);
+  const firstHalf = candles.slice(0, mid);
+  const secondHalf = candles.slice(mid);
+  const maxOf = arr => Math.max(...arr.map(c => c.high));
+  const minOf = arr => Math.min(...arr.map(c => c.low));
+
+  const higherHigh = maxOf(secondHalf) > maxOf(firstHalf);
+  const higherLow = minOf(secondHalf) > minOf(firstHalf);
+  const lowerHigh = maxOf(secondHalf) < maxOf(firstHalf);
+  const lowerLow = minOf(secondHalf) < minOf(firstHalf);
+
+  if (higherHigh && higherLow) return 1;   // bullish
+  if (lowerHigh && lowerLow) return -1;    // bearish
+  return 0;                                 // mixed
+}
+
 // Calculate Market Structure Score (0-100)
 function analyzeMarketStructure(candles) {
-  const { highs, lows } = detectSwings(candles, 2, 2);
+  // Strict pivots first; relax the right-hand confirmation if none are found so
+  // that trending series (which have few confirmed pivots) still register.
+  let { highs, lows } = detectSwings(candles, 2, 2);
+  if (highs.length < 2 || lows.length < 2) {
+    const relaxed = detectSwings(candles, 1, 1);
+    if (relaxed.highs.length >= highs.length) highs = relaxed.highs;
+    if (relaxed.lows.length >= lows.length) lows = relaxed.lows;
+  }
+
   let score = 50; // Neutral base
   let hh = 0, hl = 0, lh = 0, ll = 0;
   let text = 'Mixed / Neutral Structure';
@@ -56,8 +86,20 @@ function analyzeMarketStructure(candles) {
     score = 15;
     text = 'Bearish Structure (LH + LL)';
   } else {
-    score = 50;
-    text = 'Mixed / Consolidation Structure';
+    // Fall back to the rolling-window read rather than defaulting to neutral.
+    const bias = windowStructureBias(candles);
+    if (bias > 0) {
+      score = 72;
+      hh = 1; hl = 1;
+      text = 'Bullish Structure (rising window highs + lows)';
+    } else if (bias < 0) {
+      score = 28;
+      lh = 1; ll = 1;
+      text = 'Bearish Structure (falling window highs + lows)';
+    } else {
+      score = 50;
+      text = 'Mixed / Consolidation Structure';
+    }
   }
 
   return { score, text, details: { hh, hl, lh, ll } };
@@ -293,9 +335,17 @@ async function predict(symbol, closes) {
   }
 
   const ltp = candlesObj[candlesObj.length - 1].close;
-  const lastVol = candlesObj[candlesObj.length - 1].volume;
-  const bodyCandles = candlesObj.slice(-21, -1);
-  const avgVol = bodyCandles.reduce((s, c) => s + c.volume, 0) / 20;
+
+  // RVOL must be measured on COMPLETED bars. The final intraday bar is still
+  // forming and carries only a fraction of a full bar's volume, so comparing it
+  // against a full-bar average made the ratio structurally < 1 and permanently
+  // vetoed every BUY. Use the last closed bar against the 20 closed bars before it.
+  const closedBars = candlesObj.slice(0, -1);
+  const lastVol = closedBars.length ? closedBars[closedBars.length - 1].volume : 0;
+  const bodyCandles = closedBars.slice(-21, -1);
+  const avgVol = bodyCandles.length
+    ? bodyCandles.reduce((s, c) => s + c.volume, 0) / bodyCandles.length
+    : 0;
 
   // 1. Market Structure (25% weight)
   const ms = analyzeMarketStructure(candlesObj);
@@ -327,10 +377,31 @@ async function predict(symbol, closes) {
   // 7. Support / Resistance & Risk Reward (10% weight)
   const support = Math.min(...candlesObj.slice(-20).map(c => c.low));
   const resistance = Math.max(...candlesObj.slice(-20).map(c => c.high));
-  const distSupport = Math.max(0.1, ltp - support);
-  const distResistance = Math.max(0.1, resistance - ltp);
-  const riskRewardVal = distResistance / distSupport;
-  const rrScore = Math.min(100, Math.round(riskRewardVal * 30));
+
+  // Average True Range over the last 14 completed bars — the basis for the stop.
+  const atrBars = candlesObj.slice(-15, -1);
+  let atr = 0;
+  if (atrBars.length > 1) {
+    let trSum = 0;
+    for (let i = 1; i < atrBars.length; i++) {
+      const c = atrBars[i], p = atrBars[i - 1];
+      trSum += Math.max(c.high - c.low, Math.abs(c.high - p.close), Math.abs(c.low - p.close));
+    }
+    atr = trSum / (atrBars.length - 1);
+  }
+  if (!(atr > 0)) atr = Math.max(0.01, ltp * 0.005);
+
+  // Risk = a fixed 1.5 ATR volatility stop. Deliberately NOT floored at the
+  // 20-bar low: in a sustained trend that low is far below price, which would
+  // inflate the stop distance and crush R:R exactly when the trend is strongest.
+  // Reward = the measured move to prior resistance, or 2.5 ATR once price has
+  // cleared it (a breakout has no overhead resistance left — the old
+  // range-position formula scored that case as ZERO reward).
+  const stopDistance = atr * 1.5;
+  const headroom = resistance - ltp;
+  const rewardDistance = Math.max(headroom, atr * 2.5);
+  const riskRewardVal = stopDistance > 0 ? rewardDistance / stopDistance : 0;
+  const rrScore = Math.max(0, Math.min(100, Math.round(riskRewardVal * 40)));
 
   // 8. Candlestick Pattern Engine (10% weight)
   const patternResult = detectPatterns(candlesObj);
@@ -350,40 +421,76 @@ async function predict(symbol, closes) {
 
   const tqsPa = Math.round(scoreStructure + scoreBreakout + scoreVolume + scoreMomentum + scoreSupport + scorePatterns + scoreDouble + scoreRetest);
 
-  // Formulate Final Price Action Signal and Confidence
+  // Formulate Final Price Action Signal and Confidence.
+  // Thresholds sit at 60/40 rather than 70/30: every component is anchored at a
+  // neutral 50, so a 70 composite required nearly every sub-model to be strongly
+  // positive at once — a bar that in practice never occurs.
   let signal = 'HOLD';
   let confidence = 0.50;
 
-  if (tqsPa >= 70 || adv.score > 70) {
+  // An advanced pattern (Cup & Handle, Bull Flag, Ascending Triangle) may
+  // trigger on its own, but ONLY when market structure is not actively opposing
+  // it. Previously `adv.score > 70` was an unconditional OR, so one pattern
+  // detector could override the entire composite — measured at 11 of 12 false
+  // BUY signals inside confirmed downtrends. A bull flag in a downtrend is far
+  // more often a continuation pause than a reversal.
+  const advBullishOverride = adv.score > 70 && ms.score >= 50;
+  const advBearishOverride = adv.score < 30 && ms.score <= 50;
+
+  if (tqsPa >= 66 || advBullishOverride) {
     signal = 'BUY';
-    confidence = 0.60 + (Math.max(tqsPa, adv.score) - 70) * 0.0116;
-  } else if (tqsPa <= 30 || adv.score < 30) {
+    confidence = 0.55 + Math.min(0.35, (Math.max(tqsPa, adv.score) - 66) * 0.0100);
+  } else if (tqsPa <= 40 || advBearishOverride) {
     signal = 'SELL';
-    confidence = 0.60 + (30 - Math.min(tqsPa, adv.score)) * 0.0116;
+    confidence = 0.55 + Math.min(0.35, (40 - Math.min(tqsPa, adv.score)) * 0.0100);
   }
 
-  // Failsafe Rules check:
-  // Never generate BUY if Risk Reward < 1:1.5 OR Volume Expansion < 1.2x OR Structure Score < 60
+  // Quality modifiers.
+  //
+  // These were previously hard vetoes (RR < 1.5, RVOL < 1.2, structure < 60) and
+  // they fired SIMULTANEOUSLY on the strongest trends, so this agent could not
+  // emit BUY under any market condition — verified against 50/50 live decisions.
+  // They are now graded confidence penalties: weak evidence lowers conviction and
+  // lets the portfolio ranker deprioritise the setup, instead of silently
+  // deleting it. Only genuinely disqualifying conditions remain hard.
+  const qualityNotes = [];
   if (signal === 'BUY') {
-    if (riskRewardVal < 1.5) {
+    if (riskRewardVal < 1.2) { confidence -= 0.10; qualityNotes.push(`thin R:R ${riskRewardVal.toFixed(2)}`); }
+    if (volRatio < 0.8)      { confidence -= 0.07; qualityNotes.push(`soft RVOL ${volRatio.toFixed(2)}x`); }
+    else if (volRatio >= 1.5) { confidence += 0.05; qualityNotes.push(`RVOL surge ${volRatio.toFixed(2)}x`); }
+    if (ms.score < 45)       { confidence -= 0.10; qualityNotes.push(`structure ${ms.score} opposes long`); }
+    else if (ms.score >= 70) { confidence += 0.05; qualityNotes.push(`structure ${ms.score} supports long`); }
+
+    // HARD disqualifier: reward smaller than risk is never a valid long.
+    if (riskRewardVal < 0.8) {
       signal = 'HOLD';
       confidence = 0.50;
-    } else if (volRatio < 1.2) {
-      signal = 'HOLD';
-      confidence = 0.50;
-    } else if (ms.score < 60) {
-      signal = 'HOLD';
-      confidence = 0.50;
+      qualityNotes.push('VETO: reward below risk');
     }
   }
 
-  // Never generate SELL if Downside < 2%
   if (signal === 'SELL') {
     const downsidePct = ((ltp - support) / ltp) * 100;
-    if (downsidePct < 2.0) {
+    if (downsidePct < 1.0) { confidence -= 0.10; qualityNotes.push(`limited downside ${downsidePct.toFixed(2)}%`); }
+    if (ms.score > 55)     { confidence -= 0.10; qualityNotes.push(`structure ${ms.score} opposes short`); }
+    if (riskRewardVal < 0.8) {
       signal = 'HOLD';
       confidence = 0.50;
+      qualityNotes.push('VETO: reward below risk');
     }
+  }
+
+  confidence = Math.max(0.35, Math.min(0.95, confidence));
+
+  // A directional call is a claim that one side is more likely than the other.
+  // If the quality penalties above drag conviction to a coin flip or below, the
+  // evidence no longer supports a direction — say HOLD rather than emitting a
+  // SELL at 0.45, which reads as "bearish, but less than neutrally sure" and is
+  // incoherent for any downstream weighting. Surfaced by the 1,000-case sweep.
+  if (signal !== 'HOLD' && confidence <= 0.50) {
+    signal = 'HOLD';
+    confidence = 0.50;
+    qualityNotes.push('downgraded to HOLD: conviction fell to a coin flip');
   }
 
   // Reasoning formatting

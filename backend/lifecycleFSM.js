@@ -11,25 +11,70 @@ class LifecycleFSM extends events.EventEmitter {
     this.lastPrintReason = '';
   }
 
+  /**
+   * NSE trading holidays.
+   *
+   * TRANSCRIBED FROM THE OFFICIAL EXCHANGE CIRCULAR — do not edit from memory.
+   * Source: NSE/FAOP/71777, Circular Ref. 212/2025, dated 12-Dec-2025,
+   *         "Trading holidays for the calendar year 2026".
+   *         https://nsearchives.nseindia.com/content/circulars/FAOP71777.pdf
+   * Plus NSE CM circular 12-Jan-2026 adding 15-Jan-2026 (Maharashtra civic elections).
+   *
+   * The previous hand-written table had NINE wrong entries out of fifteen. It
+   * cost four real trading days (2026-03-06, 04-02, 05-21 and 08-28 — the last
+   * of which is Raksha Bandhan, a normal trading day) and it left the engine
+   * running against a CLOSED exchange on six genuine holidays.
+   *
+   * Dates that fall on a weekend are deliberately omitted: the weekend check
+   * already covers them, and listing them invites the false confidence that
+   * produced the previous table.
+   */
   isHoliday(dateStr) {
-    const holidays = [
-      '2026-01-26', // Republic Day
-      '2026-03-06', // Holi
-      '2026-04-02', // Mahavir Jayanti
-      '2026-04-03', // Good Friday
-      '2026-04-14', // Dr. Ambedkar Jayanti
-      '2026-05-01', // Maharashtra Day
-      '2026-05-21', // Id-ul-Zuha
-      '2026-08-15', // Independence Day
-      '2026-08-28', // Ganesh Chaturthi
-      '2026-10-02', // Gandhi Jayanti
-      '2026-10-22', // Dussehra
-      '2026-11-12', // Diwali Laxmi Puja
-      '2026-11-13', // Diwali Balipratipada
-      '2026-11-23', // Guru Nanak Jayanti
-      '2026-12-25'  // Christmas
-    ];
-    return holidays.includes(dateStr);
+    const HOLIDAYS_BY_YEAR = {
+      2026: [
+        '2026-01-15', // Municipal Corporation Election, Maharashtra
+        '2026-01-26', // Republic Day
+        '2026-03-03', // Holi
+        '2026-03-26', // Shri Ram Navami
+        '2026-03-31', // Shri Mahavir Jayanti
+        '2026-04-03', // Good Friday
+        '2026-04-14', // Dr. Baba Saheb Ambedkar Jayanti
+        '2026-05-01', // Maharashtra Day
+        '2026-05-28', // Bakri Id
+        '2026-06-26', // Muharram
+        '2026-09-14', // Ganesh Chaturthi
+        '2026-10-02', // Mahatma Gandhi Jayanti
+        '2026-10-20', // Dussehra
+        '2026-11-10', // Diwali-Balipratipada
+        '2026-11-24', // Prakash Gurpurb Sri Guru Nanak Dev
+        '2026-12-25'  // Christmas
+      ]
+    };
+
+    const year = parseInt(String(dateStr).slice(0, 4), 10);
+    const table = HOLIDAYS_BY_YEAR[year];
+
+    // FAIL LOUD ON AN UNKNOWN YEAR. The old table silently returned false for
+    // every date from 2027 onward, which would have run the engine on every
+    // holiday of the next year with no warning whatsoever.
+    if (!table) {
+      if (!this._holidayYearWarned || this._holidayYearWarned !== year) {
+        this._holidayYearWarned = year;
+        const msg = `[MARKET CALENDAR] No NSE holiday table for ${year}. ` +
+          `Update lifecycleFSM.isHoliday() from the official NSE circular before trading. ` +
+          `Treating all weekdays in ${year} as trading days is UNSAFE.`;
+        console.error(msg);
+        try {
+          require('./alerts').sendTelegram(
+            `⚠️ <b>MARKET CALENDAR MISSING</b>\nNo NSE holiday list for <b>${year}</b>. ` +
+            `The engine cannot tell holidays from trading days until it is updated.`
+          );
+        } catch (e) { /* alerts optional at this level */ }
+      }
+      return false;
+    }
+
+    return table.includes(dateStr);
   }
 
   getSystemTime() {

@@ -1,3 +1,40 @@
+/**
+ * HTML-escape any value before it goes into innerHTML.
+ *
+ * The dashboard interpolates server-supplied text into innerHTML in ~9 places
+ * with no escaping. Some of that text is already HTML (Telegram alert bodies
+ * are sent with parse_mode:'HTML', so <b> tags render as live markup in the
+ * event console), and some is free-form LLM output from Gemini/Groq or raw
+ * upstream error strings. Escape at the sink.
+ */
+function esc(v) {
+  if (v === null || v === undefined) return '—';
+  return String(v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Null-safe DOM writers.
+ *
+ * The chart engine wrote to ~26 element ids with no null guard. Several of
+ * those elements do not exist in index.html, so the first one threw and
+ * aborted the rest of the render — silently, because the caller wrapped it in
+ * a bare catch. These helpers make a missing element a no-op, not a hard stop.
+ */
+function setText(id, val) { const e = document.getElementById(id); if (e) e.innerText = val; return !!e; }
+function setHtml(id, val) { const e = document.getElementById(id); if (e) e.innerHTML = val; return !!e; }
+function setStyle(id, prop, val) { const e = document.getElementById(id); if (e) e.style[prop] = val; return !!e; }
+
+/** Format a number for display, distinguishing "unknown" from a real zero. */
+function fmtNum(v, digits = 2, suffix = '') {
+  if (v === null || v === undefined || v === '' || Number.isNaN(Number(v))) return '—';
+  return Number(v).toFixed(digits) + suffix;
+}
+
 // DOM Elements
 const connStatusDot = document.getElementById('conn-status-dot');
 const connStatusText = document.getElementById('conn-status-text');
@@ -232,10 +269,162 @@ function stopHeartbeat() {
 }
 
 // Update Dashboard UI Elements
+/**
+ * Render the Live Risk & Execution Blockers panel.
+ *
+ * Everything here is derived from data the backend already broadcasts in every
+ * STATUS_UPDATE frame and that the dashboard previously discarded:
+ *   - holdings carry avgPrice / quantity / stopLossPrice, so real rupee risk
+ *     is computable rather than guessed;
+ *   - signalSuppressionState.detailedRejections says exactly which gate killed
+ *     each candidate, which is the answer to "why is it not buying?".
+ */
+/**
+ * Populate the Ledger diagnostics tab and the strategy badge.
+ *
+ * All eight Ledger figures were hardcoded in index.html and never assigned by
+ * any JS — the panel permanently displayed 0 / 0.0% / 1.00 / 0.00 as if they
+ * were live measurements. paperTradingStats has carried every one of these
+ * values in each broadcast frame all along. Likewise activeStrategyBadge was
+ * declared at module scope and never written, so it read "--" forever.
+ */
+function renderLedgerTab(data) {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
+  const s = data.paperTradingStats;
+
+  if (!s) {
+    // Show "unknown", never a fabricated zero.
+    ['val-total-trades','val-win-rate','val-profit-factor','val-sharpe',
+     'val-drawdown','val-net-pnl','val-avg-winner','val-avg-loser'].forEach(id => set(id, '—'));
+  } else {
+    const money = v => (v === null || v === undefined || Number.isNaN(Number(v)))
+      ? '—' : '₹' + Number(v).toFixed(2);
+    set('val-total-trades',  s.total_trades === undefined ? '—' : String(s.total_trades));
+    // With zero trades these ratios are undefined, not zero. Say so.
+    const hasTrades = Number(s.total_trades) > 0;
+    set('val-win-rate',      hasTrades ? fmtNum(s.win_rate, 1, '%') : '—');
+    set('val-profit-factor', hasTrades ? fmtNum(s.profit_factor, 2) : '—');
+    set('val-sharpe',        hasTrades ? fmtNum(s.sharpe_ratio, 2) : '—');
+    set('val-drawdown',      hasTrades ? fmtNum(s.max_drawdown, 1, '%') : '—');
+    set('val-net-pnl',       hasTrades ? money(s.net_pnl) : '—');
+    set('val-avg-winner',    hasTrades ? money(s.average_winner) : '—');
+    set('val-avg-loser',     hasTrades ? money(s.average_loser) : '—');
+  }
+
+  // Strategy badge — data.strategy is broadcast and was being discarded.
+  const badge = document.getElementById('active-strategy');
+  if (badge) badge.innerText = data.strategy ? String(data.strategy).replace(/_/g, ' ') : '—';
+}
+
+function renderRiskPanel(data) {
+  const holdings = (data.holdingStocks || data.holding_stocks || []);
+  const prices = data.lastTicks || {};
+  const totalVal = Number(data.totalVal) || 0;
+
+  // 1. Capital at risk = sum over positions of (entry - stop) * qty.
+  //    Positions with no engine stop are counted separately, not silently as 0.
+  let atRisk = 0;
+  let exposure = 0;
+  let unstopped = 0;
+  holdings.forEach(h => {
+    const qty = Number(h.quantity) || 0;
+    const avg = Number(h.avgPrice) || 0;
+    const ltp = Number(prices[h.symbol]) || avg;
+    exposure += ltp * qty;
+    const stop = Number(h.stopLossPrice);
+    if (Number.isFinite(stop) && stop > 0) {
+      atRisk += Math.max(0, (ltp - stop)) * qty;
+    } else if (qty > 0) {
+      unstopped++;
+    }
+  });
+
+  const setCell = (id, text, noteId, note, cls) => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = text;
+    if (noteId) { const n = document.getElementById(noteId); if (n) n.innerText = note; }
+    if (el && el.parentElement) {
+      el.parentElement.classList.remove('is-danger', 'is-warning');
+      if (cls) el.parentElement.classList.add(cls);
+    }
+  };
+
+  setCell('risk-total-at-risk',
+    holdings.length ? '₹' + atRisk.toFixed(2) : '—',
+    'risk-at-risk-note',
+    unstopped > 0 ? `${unstopped} position(s) have NO stop` : 'if every stop fills',
+    unstopped > 0 ? 'is-danger' : null);
+
+  const exposurePct = totalVal > 0 ? (exposure / totalVal) * 100 : 0;
+  setCell('risk-open-exposure',
+    holdings.length ? '₹' + exposure.toFixed(2) : '—',
+    'risk-exposure-note',
+    totalVal > 0 ? exposurePct.toFixed(1) + '% of portfolio' : 'of portfolio',
+    exposurePct > 80 ? 'is-warning' : null);
+
+  // 2. Daily loss budget consumed. The dashboard showed the limit but never
+  //    how much of it had been used — the wrong half of the pair.
+  const limit = Math.abs(Number(data.dailyStopLossLimit) || 0);
+  const todayPnL = Number(data.today && data.today.netPnL);
+  let consumedPct = 0;
+  if (limit > 0 && Number.isFinite(todayPnL) && todayPnL < 0) {
+    consumedPct = Math.min(100, (Math.abs(todayPnL) / limit) * 100);
+  }
+  setCell('risk-loss-budget',
+    limit > 0 ? consumedPct.toFixed(0) + '%' : '—',
+    'risk-loss-note',
+    limit > 0 ? `₹${Math.abs(Math.min(0, todayPnL || 0)).toFixed(0)} of ₹${limit.toFixed(0)}` : 'consumed',
+    consumedPct >= 80 ? 'is-danger' : (consumedPct >= 50 ? 'is-warning' : null));
+
+  const bar = document.getElementById('risk-loss-bar');
+  if (bar) {
+    bar.style.width = consumedPct + '%';
+    bar.classList.remove('is-warning', 'is-danger');
+    if (consumedPct >= 80) bar.classList.add('is-danger');
+    else if (consumedPct >= 50) bar.classList.add('is-warning');
+  }
+
+  // 3. Entry gate state — previously broadcast and never surfaced anywhere,
+  //    so a trader could not tell whether the bot was accepting new entries.
+  const paused = !!(data.runtime && data.runtime.entriesPaused);
+  setCell('risk-entries-state', paused ? 'PAUSED' : 'ACTIVE', 'risk-entries-note',
+    paused ? 'no new positions' : 'accepting signals',
+    paused ? 'is-warning' : null);
+
+  // 4. Execution blockers.
+  const rejections = (data.signalSuppressionState && data.signalSuppressionState.detailedRejections) || [];
+  const list = document.getElementById('execution-blockers-list');
+  const countEl = document.getElementById('blocker-count');
+  if (countEl) countEl.innerText = rejections.length ? `${rejections.length} recent` : '';
+  if (!list) return;
+
+  if (!rejections.length) {
+    list.innerHTML = '<p class="empty-table text-xs text-center py-4">No candidates rejected yet in this run.</p>';
+    return;
+  }
+
+  list.innerHTML = rejections.slice(0, 12).map(r => {
+    const tqs = Number(r.tqs);
+    const need = Number(r.requiredThreshold);
+    // A "near miss" cleared most of the bar — these are the ones worth reading.
+    const nearMiss = Number.isFinite(tqs) && Number.isFinite(need) && (need - tqs) <= 5;
+    return `<div class="blocker-row ${nearMiss ? 'is-near-miss' : ''}">
+      <span class="blocker-sym">${esc(r.symbol)}</span>
+      <span class="blocker-score">TQS ${fmtNum(r.tqs, 0)} / need ${fmtNum(r.requiredThreshold, 0)}</span>
+      <span class="blocker-reason">${esc(r.rejectionReason)} <span style="opacity:.65">· ${esc(r.consensusVotes)} · ${esc(r.timestamp)}</span></span>
+    </div>`;
+  }).join('');
+}
+
 function updateUI(data) {
+  try { renderRiskPanel(data); } catch (e) { console.error('[RISK PANEL]', e); }
+  try { renderLedgerTab(data); } catch (e) { console.error('[LEDGER]', e); }
   const banner = document.getElementById('market-closed-banner');
   if (banner && data.marketDataDiagnostics) {
-    if (data.marketDataDiagnostics['market.isOpen'] === false) {
+    // marketDataDiagnostics has no 'market.isOpen' key, so this was always
+    // (undefined === false) -> false and the banner never rendered.
+    const mktOpen = (data.runtime && data.runtime.market) ? data.runtime.market.isOpen : undefined;
+    if (mktOpen === false) {
       banner.style.display = 'flex';
     } else {
       banner.style.display = 'none';
@@ -258,7 +447,9 @@ function updateUI(data) {
   const btnToggleBot = document.getElementById('btn-toggle-bot');
   
   if (rts.isRunning) {
-    botStatusDot.className = 'status-dot';
+    // Was 'status-dot' (bare), which CSS paints red — so a healthy running
+    // bot showed the same red dot as a stopped one. '.connected' is the green rule.
+    botStatusDot.className = 'status-dot connected';
     botStatusText.innerText = 'Bot: Active';
     btnToggleBot.innerHTML = '<i data-lucide="square"></i> <span>Stop Bot</span>';
     btnToggleBot.className = 'btn btn-danger w-full';
@@ -404,7 +595,10 @@ function updateUI(data) {
       todayNetPnL.style.color = (m.today.netPnL || 0) >= 0 ? 'var(--primary)' : 'var(--danger)';
     }
     if (todayTotalTrades && m.today) todayTotalTrades.innerText = m.today.trades !== undefined ? m.today.trades : 'N/A';
-    if (todayWinRate && m.today) todayWinRate.innerText = m.today.winRate !== undefined ? Number(m.today.winRate).toFixed(1) + '%' : 'N/A';
+    // The backend deliberately sends null for "no trades yet, win rate unknown".
+    // The old check only tested !== undefined, so Number(null) rendered a
+    // confident "0.0%" — a measured zero and an unknown must not look alike.
+    if (todayWinRate && m.today) todayWinRate.innerText = fmtNum(m.today.winRate, 1, '%');
     if (todayFees && m.today) todayFees.innerText = m.today.fees !== undefined ? '₹' + Number(m.today.fees).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : 'N/A';
     if (todayVolume && m.today) todayVolume.innerText = m.today.volume !== undefined ? '₹' + Number(m.today.volume).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : 'N/A';
 
@@ -413,7 +607,7 @@ function updateUI(data) {
       lifetimeNetPnL.style.color = (m.lifetime.netPnL || 0) >= 0 ? 'var(--primary)' : 'var(--danger)';
     }
     if (lifetimeTotalTrades && m.lifetime) lifetimeTotalTrades.innerText = m.lifetime.trades !== undefined ? m.lifetime.trades : 'N/A';
-    if (lifetimeWinRate && m.lifetime) lifetimeWinRate.innerText = m.lifetime.winRate !== undefined ? Number(m.lifetime.winRate).toFixed(1) + '%' : 'N/A';
+    if (lifetimeWinRate && m.lifetime) lifetimeWinRate.innerText = fmtNum(m.lifetime.winRate, 1, '%');
   }
 
   // Update Funnel Visualizer (Phase 3)
@@ -602,7 +796,7 @@ function updateEventConsole(alerts) {
       <span class="log-source">[${log.source}]</span>
       <span class="log-symbol">${log.symbol}</span>
       <span class="log-severity ${log.decision.toLowerCase()}">${log.decision}</span>
-      <span class="log-reason">${log.reason}</span>
+      <span class="log-reason">${esc(log.reason)}</span>
     </div>
   `).join('');
 }
@@ -763,19 +957,27 @@ window.inspectFunnelStage = function(stageName, count) {
   
   modal.classList.add('active');
 
-  const rejections = window._lastStatusData && window._lastStatusData.runtime
-    ? (window._lastStatusData.runtime.funnel || {}).last_rejected || []
-    : [];
+  // Two independent bugs made this modal permanently empty:
+  //   1. window._lastStatusData is never assigned anywhere in the codebase —
+  //      the real payload lives on window.lastDashboardData.
+  //   2. runtime.funnel.last_rejected is always [] because tradingBot calls
+  //      runtimeState.addRejection(), a method that does not exist (the real
+  //      one is addRejectedCandidate), behind an "if (fn)" guard that silently
+  //      swallows the mismatch.
+  // The genuine rejection records are in signalSuppressionState.detailedRejections,
+  // which has been broadcast in every frame all along and never read.
+  const d = window.lastDashboardData || {};
+  const rejections = (d.signalSuppressionState && d.signalSuppressionState.detailedRejections) || [];
 
-  // Loosen strict filter so we always show reasons if specific stage matching fails
-  let stageRejections = rejections.filter(r => (r.stage || '').includes(stageName) || stageName.includes(r.stage));
-  if (stageRejections.length === 0 && rejections.length > 0) {
-    stageRejections = rejections.slice(0, 5); // Show latest 5 as fallback
-  }
+  let stageRejections = rejections.filter(r => {
+    const reason = String(r.rejectionReason || '');
+    return reason.toLowerCase().includes(String(stageName || '').toLowerCase());
+  });
+  if (stageRejections.length === 0) stageRejections = rejections.slice(0, 8);
 
   const list = stageRejections.length > 0
-    ? stageRejections.map(r => `<strong>${r.symbol || 'Unknown'}</strong>: ${r.reason || 'Rejected'} <br><small>Agent: ${r.agent || 'System'} | Time: ${r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : '--'}</small>`)
-    : ['No rejection data logged in current run.'];
+    ? stageRejections.map(r => `<strong>${esc(r.symbol || 'Unknown')}</strong> — TQS ${fmtNum(r.tqs, 0)} vs required ${fmtNum(r.requiredThreshold, 0)}<br><small>${esc(r.rejectionReason || 'Rejected')}</small><br><small style="opacity:.7">conf ${fmtNum(r.confidence)} | ${esc(r.consensusVotes)} | ${esc(r.timestamp)}</small>`)
+    : ['No candidates have been rejected yet in this run.'];
 
   modalBody.innerHTML = `
     <h4 style="margin-bottom: 10px; color: var(--accent-blue);">Recent Failed Candidates</h4>
@@ -811,7 +1013,12 @@ function updateActivePositions(holdings, prices) {
 
     // stop loss & target parameters
     const targetPrice = h.targetPrice || (h.avgPrice * 1.05);
-    const stopLoss = h.stopLoss || (h.avgPrice * 0.97);
+    // The holding field is stopLossPrice (written by broker.executeOrder).
+    // Reading h.stopLoss returned undefined, so every position card rendered a
+    // synthetic avgPrice*0.97 while the engine enforced a completely different
+    // stop. The card was misreporting the trader's actual risk.
+    const stopLoss = h.stopLossPrice || h.stopLoss || (h.avgPrice * 0.97);
+    const stopIsReal = !!(h.stopLossPrice || h.stopLoss);
 
     // progress calculations
     let targetProgress = 0;
@@ -1347,7 +1554,7 @@ async function loadChartForSymbol(symbol, entryTimestamp = null, indicatorsSnaps
   if (!mainChart) return;
   
   currentSymbol = symbol;
-  document.getElementById('active-chart-symbol').innerText = symbol;
+  setText('active-chart-symbol', symbol);
   
   const queryParam = entryTimestamp ? `?symbol=${symbol}&entryTimestamp=${encodeURIComponent(entryTimestamp)}` : `?symbol=${symbol}`;
   const endpoint = `${backendBase}/api/historical-candles${queryParam}`;
@@ -1374,14 +1581,14 @@ async function loadChartForSymbol(symbol, entryTimestamp = null, indicatorsSnaps
 
     if (entryTimestamp) {
       isReplaying = true;
-      document.getElementById('replay-controls').style.display = 'flex';
+      setStyle('replay-controls', 'display', 'flex');
       
       replayIndex = Math.min(30, allReplayCandles.length);
       const initialCandles = allReplayCandles.slice(0, replayIndex);
       updateChartWithData(initialCandles, indicatorsSnapshot, consensusSnapshot);
     } else {
       isReplaying = false;
-      document.getElementById('replay-controls').style.display = 'none';
+      setStyle('replay-controls', 'display', 'none');
       currentCandles = allReplayCandles;
       updateChartWithData(currentCandles, indicatorsSnapshot, consensusSnapshot);
     }
@@ -1480,16 +1687,16 @@ function updateChartWithData(candles, indicators = null, consensus = null) {
   }
 
   // Update AI Decision Panel DOM elements
-  document.getElementById('intel-symbol').innerText = currentSymbol;
-  document.getElementById('intel-current-price').innerText = `₹${currentPrice.toFixed(2)}`;
-  document.getElementById('intel-entry-price').innerText = `₹${entryPrice.toFixed(2)}`;
-  document.getElementById('intel-target-price').innerText = `₹${targetPrice.toFixed(2)}`;
-  document.getElementById('intel-stop-loss').innerText = `₹${stopLoss.toFixed(2)}`;
-  document.getElementById('intel-rrr').innerText = rrr.toFixed(2);
-  document.getElementById('intel-tqs').innerText = `${tqsVal}%`;
-  document.getElementById('intel-confidence').innerText = Number(confidenceVal).toFixed(2);
-  document.getElementById('intel-consensus-votes').innerText = `${buyVotes}/${totalVotes}`;
-  document.getElementById('intel-agent-votes').innerHTML = votesBreakdownHtml;
+  setText('intel-symbol', currentSymbol);
+  setText('intel-current-price', `₹${currentPrice.toFixed(2)}`);
+  setText('intel-entry-price', `₹${entryPrice.toFixed(2)}`);
+  setText('intel-target-price', `₹${targetPrice.toFixed(2)}`);
+  setText('intel-stop-loss', `₹${stopLoss.toFixed(2)}`);
+  setText('intel-rrr', rrr.toFixed(2));
+  setText('intel-tqs', `${tqsVal}%`);
+  setText('intel-confidence', Number(confidenceVal).toFixed(2));
+  setText('intel-consensus-votes', `${buyVotes}/${totalVotes}`);
+  setHtml('intel-agent-votes', votesBreakdownHtml);
 
   // PREDICTION ENGINE - GENERATE PREDICTIONS
   // Determine Direction
@@ -1542,18 +1749,18 @@ function updateChartWithData(candles, indicators = null, consensus = null) {
     dirBadge.innerText = predictedDirection;
     dirBadge.className = `badge ${predictedDirection === 'BUY' ? 'bg-green' : predictedDirection === 'SELL' ? 'bg-red' : 'bg-blue'}`;
   }
-  document.getElementById('pred-probability').innerText = `${probability}%`;
-  document.getElementById('pred-move').innerText = `${expectedMove}%`;
-  document.getElementById('pred-target').innerText = `₹${expectedTargetPrice.toFixed(2)}`;
-  document.getElementById('pred-stop').innerText = `₹${expectedStopPrice.toFixed(2)}`;
+  setText('pred-probability', `${probability}%`);
+  setText('pred-move', `${expectedMove}%`);
+  setText('pred-target', `₹${expectedTargetPrice.toFixed(2)}`);
+  setText('pred-stop', `₹${expectedStopPrice.toFixed(2)}`);
   
   // Update reasoning fields
-  document.getElementById('pred-reason-ema').innerText = emaTrend;
-  document.getElementById('pred-reason-rsi').innerText = rsiCondition;
-  document.getElementById('pred-reason-support').innerText = supportInteraction;
-  document.getElementById('pred-reason-resistance').innerText = resistanceInteraction;
-  document.getElementById('pred-reason-volume').innerText = volumeConfirmation;
-  document.getElementById('pred-reason-consensus').innerText = predictedDirection === 'HOLD' ? 'NO DIRECT ACTION' : `${predictedDirection} STRATEGY APPROVED`;
+  setText('pred-reason-ema', emaTrend);
+  setText('pred-reason-rsi', rsiCondition);
+  setText('pred-reason-support', supportInteraction);
+  setText('pred-reason-resistance', resistanceInteraction);
+  setText('pred-reason-volume', volumeConfirmation);
+  setText('pred-reason-consensus', predictedDirection === 'HOLD' ? 'NO DIRECT ACTION' : `${predictedDirection} STRATEGY APPROVED`);
 }
 
 function computeVWAP(data) {
@@ -1622,7 +1829,7 @@ function setupReplayControls() {
   btnExit.onclick = () => {
     clearInterval(replayInterval);
     isReplaying = false;
-    document.getElementById('replay-controls').style.display = 'none';
+    setStyle('replay-controls', 'display', 'none');
     btnPlay.style.display = 'inline-block';
     btnPause.style.display = 'none';
     loadChartForSymbol(currentSymbol);
@@ -1632,8 +1839,8 @@ function setupReplayControls() {
 function stepReplay() {
   if (replayIndex >= allReplayCandles.length) {
     clearInterval(replayInterval);
-    document.getElementById('btn-replay-play').style.display = 'inline-block';
-    document.getElementById('btn-replay-pause').style.display = 'none';
+    setStyle('btn-replay-play', 'display', 'inline-block');
+    setStyle('btn-replay-pause', 'display', 'none');
     return;
   }
 
@@ -1702,7 +1909,12 @@ async function fetchTradesHistory() {
 
 // Controls Events
 btnToggleBot.addEventListener('click', async () => {
-  const action = isBotRunning ? 'STOP' : 'START';
+  // isBotRunning was declared at module scope and never assigned, so this
+  // always evaluated to 'START' — the Stop control was unreachable from the UI
+  // even though the button label correctly flipped to "Stop Bot".
+  const running = !!(window.lastDashboardData && window.lastDashboardData.runtime
+                     && window.lastDashboardData.runtime.isRunning);
+  const action = running ? 'STOP' : 'START';
   try {
     const res = await fetch(`${backendBase}/api/control`, {
       method: 'POST',
@@ -1781,6 +1993,70 @@ setInterval(() => {
 }, 1000);
 
 // Init on load
+// initChart() existed but was never invoked and had no container to mount
+// into, so the dashboard shipped without a chart. Both are fixed now.
+//
+// Candle data comes through marketData's throttled request queue (200ms spacing,
+// retries, a shared per-minute budget), so the first attempt can legitimately
+// return nothing. Retry with backoff, and if it still fails SAY SO in the panel
+// rather than leaving an empty box that looks like a rendering bug.
+async function bootChart(attempt = 1) {
+  const box = document.getElementById('tv-chart-container');
+  try {
+    if (typeof LightweightCharts === 'undefined') {
+      if (box) box.innerHTML = '<p class="empty-table text-xs text-center py-4">Charting library unavailable.</p>';
+      return;
+    }
+    if (attempt === 1) initChart();
+    await loadChartForSymbol('NIFTY50_MINI');
+
+    // Did any bars actually land?
+    let loaded = false;
+    try {
+      loaded = !!mainChart.timeScale().getVisibleRange();
+    } catch (e) { loaded = false; }
+
+    if (!loaded) {
+      if (attempt < 4) {
+        setTimeout(() => bootChart(attempt + 1), attempt * 2500);
+      } else if (box) {
+        box.innerHTML = '<p class="empty-table text-xs text-center py-4">Price history unavailable — the market data provider did not respond. The chart will populate on the next successful fetch.</p>';
+      }
+    }
+  } catch (e) {
+    console.error('[CHART] Initialisation failed (attempt ' + attempt + '):', e);
+    if (attempt < 4) setTimeout(() => bootChart(attempt + 1), attempt * 2500);
+  }
+}
+bootChart();
+
+// The charting library sizes its canvas once at creation and never re-measures.
+// A canvas created at a wide viewport then keeps that intrinsic width, which
+// forces its grid track wider than its share and pushes the layout sideways
+// (measured: 81px of horizontal overflow at 1440px). Keep it in step with the
+// container instead.
+(function keepChartInStep() {
+  const box = document.getElementById('tv-chart-container');
+  const rsiBox = document.getElementById('tv-rsi-container');
+  if (!box || typeof ResizeObserver === 'undefined') return;
+  let raf = null;
+  const ro = new ResizeObserver(() => {
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      try {
+        if (typeof mainChart !== 'undefined' && mainChart) {
+          mainChart.applyOptions({ width: box.clientWidth, height: box.clientHeight || 260 });
+        }
+        if (typeof rsiChart !== 'undefined' && rsiChart && rsiBox) {
+          rsiChart.applyOptions({ width: rsiBox.clientWidth, height: rsiBox.clientHeight || 84 });
+        }
+      } catch (e) { /* chart not ready yet */ }
+    });
+  });
+  ro.observe(box);
+  if (rsiBox) ro.observe(rsiBox);
+})();
+
 connectWS();
 fetchTradesHistory();
 updateInstitutionalTelemetry();

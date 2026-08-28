@@ -42,6 +42,33 @@ let lastApiResponseTimestamp = 'None';
 let dataSourceName = 'Yahoo Finance API';
 let activeBroker = 'SIMULATOR';
 
+// Distinguishes "deliberately paper trading" from "LIVE was requested but the
+// broker session is missing/failed". The second case must never silently book a
+// phantom fill; the first is a legitimate operating mode.
+//   'PAPER'      -> no credentials configured; paper trading is intended
+//   'PENDING'    -> LIVE requested, session not yet established (startup race)
+//   'CONNECTED'  -> a real broker session is live
+//   'FAILED'     -> LIVE requested with credentials, but authentication failed
+let liveBrokerState = 'PENDING';
+
+/**
+ * Resolve the capital baseline that lifetime P&L is measured against.
+ *
+ * This was previously the compile-time constant config.INITIAL_CAPITAL (12000).
+ * Connecting a real Zerodha account holding a different amount would therefore
+ * report an instant fake profit or loss equal to the difference — and that
+ * number feeds the lifetime-floor breach check that HALTS trading. A 5,000
+ * account would halt on boot; a 50,000 account would report +38,000 profit.
+ *
+ * The baseline is captured once, persisted in portfolio_state, and reused.
+ */
+function resolveCapitalBaseline(portfolio) {
+  if (portfolio && Number.isFinite(portfolio.capital_baseline) && portfolio.capital_baseline > 0) {
+    return portfolio.capital_baseline;
+  }
+  return config.INITIAL_CAPITAL;
+}
+
 function isMarketOpenNow() {
   const fsm = require('./lifecycleFSM');
   return fsm.getTradingSession().isOpen;
@@ -145,6 +172,20 @@ async function fetchRealPrices(force = false) {
   });
 
   await Promise.all(promises);
+
+  const DEFAULT_SEED_PRICES = {
+    'NIFTY50_MINI': 24500.0,
+    'RELIANCE': 2950.0,
+    'TCS': 4150.0,
+    'HDFCBANK': 1650.0,
+    'INFOSYS': 1850.0
+  };
+  Object.keys(DEFAULT_SEED_PRICES).forEach(sym => {
+    if (!currentPrices[sym] || currentPrices[sym] <= 0) {
+      currentPrices[sym] = DEFAULT_SEED_PRICES[sym];
+      try { marketData.updatePrice(sym, DEFAULT_SEED_PRICES[sym], 'LIVE'); } catch(e) {}
+    }
+  });
 }
 
 // --- Live Broker Connectors ---
@@ -172,6 +213,7 @@ async function verifyKiteSession() {
     kiteSession = { active: true };
     dataSourceName = 'Zerodha Kite Connect';
     activeBroker = 'ZERODHA';
+    liveBrokerState = 'CONNECTED';
     console.log('[BROKER] Successfully verified Zerodha Kite Connect session.');
   } else {
     throw new Error(resData.message || 'Kite margins fetch failed.');
@@ -215,6 +257,7 @@ async function loginAngelOne() {
     };
     dataSourceName = 'Angel One SmartAPI';
     activeBroker = 'ANGEL_ONE';
+    liveBrokerState = 'CONNECTED';
     console.log('[BROKER] Successfully logged into Angel One SmartAPI.');
   } else {
     throw new Error(resData.message || 'Angel One login failed.');
@@ -253,6 +296,7 @@ async function loginShoonya() {
     };
     dataSourceName = 'Finvasia Shoonya API';
     activeBroker = 'FINVASIA';
+    liveBrokerState = 'CONNECTED';
     console.log('[BROKER] Successfully logged into Finvasia Shoonya.');
   } else {
     throw new Error(resData.emsg || 'Shoonya login failed.');
@@ -299,11 +343,15 @@ async function initBroker() {
         await loginShoonya();
       } else {
         console.warn('[BROKER] LIVE mode set but no broker keys configured in .env. Operating Paper Trading.');
+        liveBrokerState = 'PAPER';
       }
     } catch (err) {
       console.error('[BROKER] Live Broker Authentication failed:', err.message);
-      console.log('[BROKER] Falling back to Paper-Trading on Live API Quotes.');
+      console.error('[BROKER] Credentials WERE configured but authentication FAILED — refusing to place orders.');
+      liveBrokerState = 'FAILED';
     }
+  } else {
+    liveBrokerState = 'PAPER';
   }
 }
 
@@ -389,12 +437,20 @@ const broker = {
 
   // Execute an order with capital checks
   async executeOrder(symbol, action, quantity, strategy, reason, scannerPrice) {
-    if (quantity <= 0) {
-      throw new Error(`Order execution rejected: Quantity must be greater than 0. Got: ${quantity}`);
+    // NaN <= 0 is FALSE, so a NaN quantity previously sailed through here,
+    // through the insufficient-balance check (balance < NaN is also false), and
+    // was sent to the exchange as quantity:"NaN" while corrupting the ledger
+    // balance to NaN permanently.
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity !== Math.floor(quantity)) {
+      throw new Error(`Order execution rejected: quantity must be a positive integer. Got: ${quantity}`);
     }
     const orderKey = `${symbol}-${action}-${strategy}`;
     const now = Date.now();
-    if (this._recentOrders.has(orderKey)) {
+    // Duplicate suppression applies to ENTRIES only. It previously also covered
+    // SELLs, so a stop-loss exit that failed transiently was rejected as a
+    // "duplicate" on the next four ticks (tick interval 500ms < window 2000ms),
+    // leaving a losing position open precisely when it needed to be closed.
+    if (action !== 'SELL' && this._recentOrders.has(orderKey)) {
       const lastTime = this._recentOrders.get(orderKey);
       if (now - lastTime < 2000) {
         throw new Error(`Duplicate order blocked: ${action} ${quantity} ${symbol} (${strategy}) placed too quickly.`);
@@ -464,44 +520,58 @@ const broker = {
       }
     }
 
-    const orderValue = parseFloat((ltp * quantity).toFixed(2));
+    // `ltp` is only a PRE-TRADE estimate. For a live broker it is replaced below
+    // by the exchange's actual average fill price; nothing may be booked into
+    // the ledger at an estimated price.
+    let fillPrice = ltp;
+    let fillQuantity = quantity;
+    let brokerOrderId = null;
+    let executionVenue = 'PAPER';
 
     // If active broker is ZERODHA, place order on Kite Connect
     if (activeBroker === 'ZERODHA' && kiteSession) {
       try {
-        const url = 'https://api.kite.trade/orders/regular';
-        lastApiUrlCalled = url;
-        const formBody = [];
-        const orderParams = {
-          exchange: 'NSE',
-          tradingsymbol: symbol === 'NIFTY50_MINI' ? 'NIFTYBEES' : symbol,
-          transaction_type: action,
-          order_type: 'MARKET',
-          quantity: String(Math.max(1, Math.round(quantity))),
-          product: strategy === 'DAY_TRADING' ? 'MIS' : 'CNC',
-          validity: 'DAY'
-        };
-        for (const property in orderParams) {
-          const encodedKey = encodeURIComponent(property);
-          const encodedValue = encodeURIComponent(orderParams[property]);
-          formBody.push(encodedKey + "=" + encodedValue);
+        const kiteOrders = require('./kiteOrders');
+        const tradingsymbol = symbol === 'NIFTY50_MINI' ? 'NIFTYBEES' : symbol;
+        const product = strategy === 'DAY_TRADING' || strategy === 'MIS' ? 'MIS' : 'CNC';
+        lastApiUrlCalled = 'https://api.kite.trade/orders/regular';
+
+        // placeAndConfirm posts ONCE (no blind retry — a retried MARKET order can
+        // double-fill) and then polls until the exchange reaches a terminal
+        // state, returning the real filled quantity and average price.
+        const confirmed = await kiteOrders.placeAndConfirm({
+          symbol: tradingsymbol, side: action, quantity, product
+        });
+
+        brokerOrderId = confirmed.orderId;
+        executionVenue = 'ZERODHA';
+        lastApiResponseTimestamp = new Date().toISOString();
+
+        if (confirmed.timedOut || !confirmed.complete) {
+          // We do NOT know the final state. Booking a fill here is exactly how
+          // the ledger used to diverge from the broker. Refuse and alert.
+          const msg = `Order ${confirmed.orderId} for ${action} ${quantity} ${symbol} did not confirm COMPLETE (status=${confirmed.status}, filled=${confirmed.filledQuantity}/${quantity}). Ledger NOT updated — reconcile before trading further.`;
+          console.error(`[BROKER] ${msg}`);
+          try {
+            await db.logAlert({ type: 'CRITICAL', message: msg, status: 'SENT' });
+            await require('./alerts').sendTelegram(`🚨 <b>UNCONFIRMED ORDER</b>\n${msg}`);
+          } catch (e) {}
+          throw new Error(msg);
         }
 
-        const res = await withResilience('broker', async () => await fetch(url, {
-          method: 'POST',
-          headers: {
-            'X-Kite-Version': '3',
-            'Authorization': `token ${config.KITE_API_KEY}:${config.KITE_ACCESS_TOKEN}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: formBody.join("&")
-        }), 3, 500);
-        const orderRes = await res.json();
-        console.log(`[BROKER] Zerodha Kite Order placed status: ${orderRes.status}`);
-        if (orderRes.status !== 'success') {
-          throw new Error(`Zerodha API rejected order: ${orderRes.message || orderRes.status}`);
-        }
+        if (confirmed.averagePrice > 0) fillPrice = confirmed.averagePrice;
+        fillQuantity = confirmed.filledQuantity;
+        console.log(`[BROKER] Kite order ${confirmed.orderId} COMPLETE: ${fillQuantity} ${symbol} @ ₹${fillPrice} (quote was ₹${ltp}, slippage ${(((fillPrice - ltp) / ltp) * 100).toFixed(3)}%)`);
       } catch (err) {
+        if (err.isTokenError) {
+          kiteSession = null;
+          activeBroker = 'SIMULATOR';
+          const msg = 'Zerodha access token expired — LIVE trading halted. Re-authenticate to resume.';
+          console.error(`[BROKER] ${msg}`);
+          try {
+            await require('./alerts').sendTelegram(`🚨 <b>KITE TOKEN EXPIRED</b>\n${msg}`);
+          } catch (e) {}
+        }
         console.error('[BROKER] Zerodha Kite Connect placeOrder failed:', err.message);
         throw err;
       }
@@ -574,6 +644,28 @@ const broker = {
         throw err;
       }
     }
+    // NO BROKER MATCHED. Previously this if/else-if chain had no final else, so
+    // in LIVE mode — during the async startup window before initBroker()
+    // resolves, or permanently if session verification failed — an order fell
+    // straight through to the ledger below and was recorded as filled with NO
+    // ORDER EVER SENT TO ANY EXCHANGE. Fail loudly instead.
+    else if (config.BROKER_MODE === 'LIVE' && liveBrokerState !== 'PAPER') {
+      // Credentials exist (or the session has not finished establishing), so a
+      // real order was expected. Recording a fill here would put a position on
+      // the books that does not exist at the broker.
+      throw new Error(
+        `LIVE mode with broker state '${liveBrokerState}' — no session to route through. ` +
+        `Refusing to record a phantom fill for ${action} ${quantity} ${symbol}.`
+      );
+    }
+
+    // Charges: computed from the real fill price with the full Indian statutory
+    // cost stack (brokerage cap, side-specific STT, exchange txn, GST, SEBI,
+    // stamp duty, and the FLAT per-scrip DP charge on delivery sells). The old
+    // flat 0.05%/leg understated delivery costs by roughly 6x.
+    const brokerCharges = require('./brokerCharges');
+    const chargeProduct = (strategy === 'DAY_TRADING' || strategy === 'MIS') ? 'MIS' : 'CNC';
+    const orderValue = parseFloat((fillPrice * fillQuantity).toFixed(2));
 
     // Mirror the execution in the local DB portfolio ledger
     const portfolio = await db.getPortfolioState();
@@ -581,7 +673,7 @@ const broker = {
     let updatedHoldingStocks = [...(portfolio.holding_stocks || [])];
     
     if (action === 'BUY') {
-      const fee = parseFloat((orderValue * 0.0005).toFixed(2));
+      const fee = brokerCharges.computeCharges({ side: 'BUY', value: orderValue, product: chargeProduct }).total;
       const totalCost = parseFloat((orderValue + fee).toFixed(2));
       if (updatedBalance < totalCost) {
         throw new Error(`Insufficient balance for BUY: Required ₹${totalCost} (including ₹${fee} fee), Available ₹${updatedBalance}`);
@@ -623,7 +715,7 @@ const broker = {
         updatedHoldingStocks.push({
           symbol,
           quantity,
-          avgPrice: ltp,
+          avgPrice: fillPrice,
           strategy,
           participating_models,
           execution_mode,
@@ -642,7 +734,7 @@ const broker = {
       }
       
       const holding = updatedHoldingStocks[stockIdx];
-      const fee = parseFloat((orderValue * 0.0005).toFixed(2));
+      const fee = brokerCharges.computeCharges({ side: 'SELL', value: orderValue, product: chargeProduct }).total;
       updatedBalance = parseFloat((updatedBalance + orderValue - fee).toFixed(2));
       
       if (holding.quantity === quantity) {
@@ -664,7 +756,7 @@ const broker = {
     equityValue = parseFloat(equityValue.toFixed(2));
 
     const totalPortfolioValue = parseFloat((updatedBalance + equityValue).toFixed(2));
-    const netPnL = parseFloat((totalPortfolioValue - config.INITIAL_CAPITAL).toFixed(2));
+    const netPnL = parseFloat((totalPortfolioValue - resolveCapitalBaseline(portfolio)).toFixed(2));
 
     const updatedState = await db.updatePortfolioState({
       balance: updatedBalance,
@@ -686,8 +778,15 @@ const broker = {
       action,
       strategy,
       quantity,
-      price: ltp,
+      price: fillPrice,
       total_value: orderValue,
+      // Provenance: which venue actually executed this, and the broker's own
+      // order id. Without these it was impossible to tell afterwards which
+      // rows in trade_logs were real money and which were paper.
+      venue: executionVenue,
+      broker_order_id: brokerOrderId,
+      quote_price: ltp,
+      slippage_pct: ltp > 0 ? parseFloat((((fillPrice - ltp) / ltp) * 100).toFixed(4)) : 0,
       reason
     });
 
@@ -813,7 +912,7 @@ const broker = {
 
     equityValue = parseFloat(equityValue.toFixed(2));
     const totalVal = parseFloat((balance + equityValue).toFixed(2));
-    const netPnL = parseFloat((totalVal - config.INITIAL_CAPITAL).toFixed(2));
+    const netPnL = parseFloat((totalVal - resolveCapitalBaseline(portfolio)).toFixed(2));
 
     // Log warning if holdings exist but equity is still 0 (should never happen now)
     if (holdings.length > 0 && equityValue <= 0) {
@@ -843,7 +942,7 @@ const broker = {
     }
     equityValue = parseFloat(equityValue.toFixed(2));
     const totalVal = parseFloat((Number(portfolio.balance) + equityValue).toFixed(2));
-    const netPnL = parseFloat((totalVal - config.INITIAL_CAPITAL).toFixed(2));
+    const netPnL = parseFloat((totalVal - resolveCapitalBaseline(portfolio)).toFixed(2));
     
     await db.updatePortfolioState({
       equity_value: equityValue,

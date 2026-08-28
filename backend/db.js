@@ -8,6 +8,7 @@ const DB_FILE = path.join(__dirname, '..', process.env.DB_FILE || 'db.json');
 
 let pool = null;
 let dbAvailable = false;
+let lastDbOutageAlertMs = 0;   // throttles the DB-outage alert to once an hour
 let syncInProgress = false;
 let syncInterval = null;
 
@@ -246,6 +247,14 @@ let isWriting = false;
 let pendingWrite = null;
 
 function writeLocalDb(data) {
+  if (data) {
+    if (Array.isArray(data.consensus_decisions) && data.consensus_decisions.length > 100) data.consensus_decisions = data.consensus_decisions.slice(-100);
+    if (Array.isArray(data.prediction_logs) && data.prediction_logs.length > 100) data.prediction_logs = data.prediction_logs.slice(-100);
+    if (Array.isArray(data.alerts) && data.alerts.length > 100) data.alerts = data.alerts.slice(-100);
+    if (Array.isArray(data.agent20_reports) && data.agent20_reports.length > 100) data.agent20_reports = data.agent20_reports.slice(-100);
+    if (Array.isArray(data.agent23_journals) && data.agent23_journals.length > 100) data.agent23_journals = data.agent23_journals.slice(-100);
+    if (Array.isArray(data.pipeline_logs) && data.pipeline_logs.length > 100) data.pipeline_logs = data.pipeline_logs.slice(-100);
+  }
   localDbCache = data;
   try {
     const tmpFile = DB_FILE + '.tmp';
@@ -286,6 +295,26 @@ async function checkPostgresConnection() {
   consecutiveDbFailures++;
   if (consecutiveDbFailures === 1) {
     console.warn('[DB CRITICAL]: Neon PostgreSQL connection lost. Running on Safe Local Mode.');
+  }
+
+  // The database can die completely and the operator would never learn of it —
+  // this path was console-only. "Safe Local Mode" writes to db.json, which on
+  // Render is an EPHEMERAL container disk: it dies with the process, so every
+  // trade, daily stat and learning record is lost on the next restart with no
+  // warning. That is not safe, and it must be said out loud.
+  const nowMs = Date.now();
+  if (!lastDbOutageAlertMs || nowMs - lastDbOutageAlertMs > 3600000) {
+    lastDbOutageAlertMs = nowMs;
+    try {
+      require('./alerts').sendTelegram(
+        `🔴 <b>DATABASE OFFLINE</b>\n` +
+        `Neon PostgreSQL is unreachable after ${attempts} attempts. The engine has fallen back to local-file mode.\n\n` +
+        `<b>Nothing is being persisted durably.</b> On a hosted container this file is wiped on restart, so trades and daily stats will be lost.\n\n` +
+        `Common cause: the Neon compute-time quota has been exhausted.`
+      );
+    } catch (e) {
+      console.error('[DB CRITICAL] Could not raise outage alert:', e.message);
+    }
   }
   return false;
 }
@@ -1014,9 +1043,12 @@ async function syncLocalToPostgres() {
 
     // Sync trade logs
     await syncArray('trade_logs', 'trade_logs', (item) => ({
-      query: `INSERT INTO trade_logs (id, timestamp, symbol, action, strategy, quantity, price, total_value, reason) 
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO NOTHING`,
-      args: [item.id, item.timestamp, item.symbol, item.action, item.strategy, Number(item.quantity), Number(item.price), Number(item.total_value), item.reason]
+      query: `INSERT INTO trade_logs (id, timestamp, symbol, action, strategy, quantity, price, total_value, reason, execution_mode, venue, broker_order_id, quote_price, slippage_pct)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (id) DO NOTHING`,
+      args: [item.id, item.timestamp, item.symbol, item.action, item.strategy, Number(item.quantity), Number(item.price), Number(item.total_value), item.reason,
+             item.execution_mode ?? null, item.venue ?? null, item.broker_order_id ?? null,
+             item.quote_price != null ? Number(item.quote_price) : null,
+             item.slippage_pct != null ? Number(item.slippage_pct) : null]
     }));
 
     // Sync prediction logs
@@ -1539,8 +1571,8 @@ const db = {
 
     if (dbAvailable) {
       const res = await runQuery(`
-        INSERT INTO trade_logs (id, timestamp, symbol, action, strategy, quantity, price, total_value, reason, execution_mode)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        INSERT INTO trade_logs (id, timestamp, symbol, action, strategy, quantity, price, total_value, reason, execution_mode, venue, broker_order_id, quote_price, slippage_pct)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
         ON CONFLICT (id) DO NOTHING
       `, [
         tradeLog.id,
@@ -1552,7 +1584,14 @@ const db = {
         Number(tradeLog.price),
         Number(tradeLog.total_value),
         tradeLog.reason,
-        tradeLog.execution_mode
+        tradeLog.execution_mode,
+        // Execution provenance: which venue actually filled this, the broker's
+        // own order id, the pre-trade quote, and the resulting slippage.
+        // broker.js has been passing these; the INSERT was silently dropping them.
+        tradeLog.venue ?? null,
+        tradeLog.broker_order_id ?? null,
+        tradeLog.quote_price != null ? Number(tradeLog.quote_price) : null,
+        tradeLog.slippage_pct != null ? Number(tradeLog.slippage_pct) : null
       ]);
       if (res !== null) {
         tradeLog.synced = true;
@@ -2210,12 +2249,23 @@ const db = {
   },
 
   // Log system alert
-  async logAlert(alert) {
+  async logAlert(alert, maybeMessage) {
+    // Accept BOTH call styles. Three call sites — including the two most
+    // safety-critical alerts in the system (order failure in broker.js and the
+    // valuation price-source mismatch) — used the positional form
+    // logAlert('CRITICAL', message). That produced type/message === undefined,
+    // which violates the NOT NULL constraints in schema.sql, so those alerts
+    // were silently discarded in both storage modes.
+    if (typeof alert === 'string') {
+      alert = { type: alert, message: String(maybeMessage ?? '') };
+    }
+    alert = alert || {};
+
     const item = {
       id: `ALT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       timestamp: alert.timestamp || new Date().toISOString(),
-      type: alert.type,
-      message: alert.message,
+      type: alert.type || 'INFO',
+      message: alert.message || '(no message)',
       status: alert.status || 'SENT',
       synced: false
     };

@@ -118,33 +118,65 @@ const riskEngine = {
   },
 
   // Emergency Panic Squared Off Trigger
+  //
+  // Previously called broker.placeOrder(), which does not exist on the broker
+  // module (the method is executeOrder). Every iteration threw TypeError, the
+  // error was swallowed, and the code then UNCONDITIONALLY cleared
+  // holding_stocks — reporting a flat book while every real position was still
+  // open at the broker. Now: sell via the real API, and only drop the positions
+  // that actually sold.
   async triggerEmergencySquareOff(broker, activeHoldings = []) {
     console.warn('[RISK ENGINE] ⚠️ EMERGENCY PANIC SWITCH ACTIVATED! LIQUIDATING ALL POSITIONS.');
     const db = require('./db');
-    
+
+    const succeeded = [];
+    const failed = [];
+
     for (const holding of activeHoldings) {
+      const qty = holding.quantity;
+      if (!qty || qty <= 0) continue;
+      let sold = false;
+      // Market orders can be rejected transiently (circuit limits, freeze
+      // quantity, momentary auth failure). Retry before giving up — an
+      // un-squared intraday position is a real financial exposure.
+      for (let attempt = 1; attempt <= 3 && !sold; attempt++) {
+        try {
+          console.log(`[RISK ENGINE] Squaring off ${holding.symbol} (Qty: ${qty}) attempt ${attempt}/3...`);
+          await broker.executeOrder(
+            holding.symbol,
+            'SELL',
+            qty,
+            holding.strategy || 'DAY_TRADING',
+            'Emergency square-off'
+          );
+          sold = true;
+        } catch (err) {
+          console.error(`[RISK ENGINE] Square-off attempt ${attempt} failed for ${holding.symbol}: ${err.message}`);
+          if (attempt < 3) await new Promise(r => setTimeout(r, 1500));
+        }
+      }
+      if (sold) succeeded.push(holding.symbol);
+      else failed.push(holding.symbol);
+    }
+
+    // executeOrder already removes filled positions from holding_stocks.
+    // Never blank the ledger wholesale: anything that failed to sell is still a
+    // live position and MUST stay on the book so the operator and the next tick
+    // can see it.
+    if (failed.length > 0) {
+      const msg = `[RISK ENGINE] ❌ SQUARE-OFF INCOMPLETE. Still holding: ${failed.join(', ')}. Manual intervention required.`;
+      console.error(msg);
       try {
-        console.log(`[RISK ENGINE] Squaring off ${holding.symbol} (Qty: ${holding.quantity})...`);
-        // Place market order to sell all quantities
-        await broker.placeOrder({
-          symbol: holding.symbol,
-          action: 'SELL',
-          quantity: holding.quantity,
-          orderType: 'MARKET',
-          product: 'CNC'
-        });
-      } catch (err) {
-        console.error(`[RISK ENGINE] Failed to sell ${holding.symbol}:`, err.message);
+        await db.logAlert('CRITICAL', msg);
+        const alerts = require('./alerts');
+        await alerts.sendTelegram(`🚨 <b>SQUARE-OFF FAILED</b>\nUnsold positions: <b>${failed.join(', ')}</b>\nThese are still open at the broker. Manual action required.`);
+      } catch (e) {
+        console.error('[RISK ENGINE] Failed to raise square-off alert:', e.message);
       }
     }
 
-    // Reset portfolio holding stocks to empty
-    const portfolio = await db.getPortfolioState();
-    portfolio.holding_stocks = [];
-    await db.updatePortfolioState(portfolio);
-
-    console.log('[RISK ENGINE] Emergency square-off completed.');
-    return true;
+    console.log(`[RISK ENGINE] Emergency square-off complete. Sold: ${succeeded.length}, Failed: ${failed.length}.`);
+    return { success: failed.length === 0, sold: succeeded, unsold: failed };
   }
 };
 

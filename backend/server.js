@@ -983,7 +983,7 @@ server.listen(config.PORT, '0.0.0.0', () => {
       telegramControl.initTelegram(app);
       
       console.log('[STARTUP] Init Scanner');
-      const marketScanner = require('../scratch/market_scanner');
+      const marketScanner = require('./marketScanner');
       if (marketScanner.init) marketScanner.init();
       
       console.log('[STARTUP] Start Scheduler');
@@ -1010,9 +1010,32 @@ server.listen(config.PORT, '0.0.0.0', () => {
       }, { timezone: "Asia/Kolkata" });
       
       // Schedule Bot Stop (03:30 PM IST Monday-Friday)
-      cron.schedule('30 15 * * 1-5', () => {
-        console.log('[CRON] 03:30 PM - Halting Trading Engine after EOD processes...');
+      cron.schedule('30 15 * * 1-5', async () => {
+        console.log('[CRON] 03:30 PM - Finalising the market day...');
+        // finalizeMarketDay() must run BEFORE stop(). The FSM only reports the
+        // EOD state between 15:35 and 15:40, but stop() clears the tick interval
+        // at 15:30 — so the end-of-day report was unreachable on every normal
+        // trading day. Call it directly instead of hoping the tick loop gets there.
+        try {
+          const fsmNow = require('./lifecycleFSM').getSystemTime();
+          await tradingBot.finalizeMarketDay(fsmNow.dateStr);
+        } catch (e) {
+          console.error('[CRON] finalizeMarketDay failed:', e.message);
+        }
+        try {
+          await tradingBot.announceSessionClose();
+        } catch (e) {
+          console.error('[CRON] Session close announcement failed:', e.message);
+        }
+        console.log('[CRON] 03:30 PM - Halting Trading Engine.');
         tradingBot.stop();
+      }, { timezone: "Asia/Kolkata" });
+
+      // Weekend stand-down. The two crons above are Mon-Fri only, so without
+      // this a weekend is 100% silent even when the process is healthy.
+      cron.schedule('0 9 * * 6,0', async () => {
+        try { await require('./sessionAnnouncer').announceStandDown(); }
+        catch (e) { console.error('[CRON] Weekend stand-down notice failed:', e.message); }
       }, { timezone: "Asia/Kolkata" });
 
       // Immediate Boot Check
@@ -1020,6 +1043,19 @@ server.listen(config.PORT, '0.0.0.0', () => {
       const timeInfo = fsm.getSystemTime();
       const currentMins = timeInfo.hours * 60 + timeInfo.minutes;
       const session = fsm.getTradingSession();
+
+      // Tell the operator the engine is up and whether it will trade today.
+      // Previously boot was console-only, so "holiday" and "crashed" looked
+      // identical from the outside.
+      try {
+        const announcer = require('./sessionAnnouncer');
+        await announcer.announceBoot({ brokerMode: config.BROKER_MODE });
+        if (session.isWeekend || session.isHoliday) {
+          await announcer.announceStandDown();
+        }
+      } catch (e) {
+        console.error('[STARTUP] Boot announcement failed:', e.message);
+      }
       
       // Start immediately if booting inside the active window (08:55 to 15:40) on a weekday
       if (currentMins >= 8 * 60 + 55 && currentMins < 15 * 60 + 40 && !session.isWeekend && !session.isHoliday) {
@@ -1031,6 +1067,19 @@ server.listen(config.PORT, '0.0.0.0', () => {
       }
     } catch (err) {
       console.error('[STARTUP] Error during async background boot sequence:', err);
+      // This catch previously swallowed a TOTAL failure: if the boot sequence
+      // throws, the crons are never registered and the bot never trades — yet
+      // the HTTP server still answers 200, so nothing looks wrong. Say it out loud.
+      try {
+        await require('./alerts').sendTelegram(
+          `🔴 <b>STARTUP FAILED</b>\n` +
+          `The engine could not complete its boot sequence and will NOT trade today.\n\n` +
+          `<b>Error:</b> ${err.message}\n\n` +
+          `The web server is up, but the scheduler is not armed. This needs attention.`
+        );
+      } catch (e) {
+        console.error('[STARTUP] Could not send startup-failure alert:', e.message);
+      }
     }
   })();
 });

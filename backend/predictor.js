@@ -8,9 +8,7 @@ const agent4_context = require('./agent4_context');
 const dynamicThreshold = require('./dynamicThreshold');
 const runtimeState = require('./runtimeState');
 const priceActionAgent = require('./priceActionStructureAgent');
-const confidenceEngine = require('./confidenceEngine');
 const institutionalConfluenceEngine = require('./institutionalConfluenceEngine');
-const marketRegimeAgent = require('./marketRegimeAgent');
 const volumeIntelligenceAgent = require('./volumeIntelligenceAgent');
 const smcAgent = require('./smcAgent');
 const marketData = require('./marketData');
@@ -313,12 +311,19 @@ const predictor = {
     activeWeights.agent11_weight = 0.10;
     activeWeights.agent12_weight = 0.12;
 
-    if (portfolio.model_weights) {
-      activeWeights.emaWeight = portfolio.model_weights.emaWeight || 0.40;
-      activeWeights.rsiWeight = portfolio.model_weights.rsiWeight || 0.30;
-      activeWeights.macdWeight = portfolio.model_weights.macdWeight || 0.30;
-      activeWeights.rsiThreshold = portfolio.model_weights.rsiThreshold || 50;
-      activeWeights.adaptationCount = portfolio.model_weights.adaptationCount || 0;
+    if (portfolio && portfolio.model_weights) {
+      // The forced distribution above is authoritative for agent weights. This
+      // merge previously ran AFTER it and overwrote agent1/2/3/4 straight back
+      // to stale DB values — so the comment "override any DB states" described
+      // the opposite of what happened, and agent1 ran at 0.35 instead of 0.15.
+      const FORCED = new Set(['agent1_weight','agent2_weight','agent3_weight','agent4_weight',
+        'agent5_weight','agent6_weight','agent7_weight','agent9_weight',
+        'agent10_weight','agent11_weight','agent12_weight']);
+      Object.keys(portfolio.model_weights).forEach(k => {
+        if (portfolio.model_weights[k] !== undefined && !FORCED.has(k)) {
+          activeWeights[k] = portfolio.model_weights[k];
+        }
+      });
     } else {
       activeWeights.emaWeight = 0.40;
       activeWeights.rsiWeight = 0.30;
@@ -420,11 +425,16 @@ const predictor = {
     // Helper: Map closes to candles
     function mapToCandles(history) {
       return history.closes.map((close, i) => ({
-        open: i > 0 ? history.closes[i-1] : close,
+        // Use the real open when the provider supplied one. Falling back to the
+        // previous close (as this did unconditionally) erases every opening gap,
+        // which is exactly the information candle-pattern detection depends on.
+        open: (history.opens && history.opens[i] != null) ? history.opens[i] : (i > 0 ? history.closes[i - 1] : close),
         close,
-        high: history.highs[i] || close,
-        low: history.lows[i] || close,
-        volume: history.volumes[i] || 1000
+        high: history.highs[i] != null ? history.highs[i] : close,
+        low: history.lows[i] != null ? history.lows[i] : close,
+        // Volume must NOT default to a fake 1000 — a fabricated constant makes
+        // RVOL meaningless. Zero is the honest value for a missing bar.
+        volume: history.volumes && history.volumes[i] != null ? history.volumes[i] : 0
       }));
     }
 
@@ -460,12 +470,44 @@ const predictor = {
 
     // Multi-Timeframe Alignment: majority voting across 5 timeframes
     // If 3+ timeframes agree on a direction, we have alignment
+    // MULTI-TIMEFRAME ALIGNMENT — higher-timeframe context only.
+    //
+    // This previously counted five "timeframes" as if they were five independent
+    // opinions. They were not:
+    //   m1History = m5History          -> trend1M is BYTE-IDENTICAL to trend5M
+    //   m15History = resample(m5, 3)   -> derived from the same series
+    //   h1History  = resample(m5, 12)  -> derived from the same series
+    // So one 5-minute series cast four of the five votes, and one of those was a
+    // literal duplicate. With the 5M EMA bearish in 82 of 100 measured records,
+    // that guaranteed two SELL votes and dragged the resampled pair with it, so
+    // a 3-of-5 BUY alignment was close to unreachable.
+    //
+    // Alignment is a HIGHER-timeframe question, so the execution timeframe (5M)
+    // and its duplicate no longer vote here — 5M drives the entry trigger
+    // separately. Three horizons, majority of 2.
     const trendVotes = { BUY: 0, SELL: 0 };
-    [trend1D, trend1H, trend15M, trend5M, trend1M].forEach(t => {
+    [trend1D, trend1H, trend15M].forEach(t => {
       if (t === 'BUY') trendVotes.BUY++;
       else if (t === 'SELL') trendVotes.SELL++;
     });
-    const alignedMTF = trendVotes.BUY >= 3 ? 'BUY' : (trendVotes.SELL >= 3 ? 'SELL' : 'HOLD');
+    const alignedMTF = trendVotes.BUY >= 2 ? 'BUY' : (trendVotes.SELL >= 2 ? 'SELL' : 'HOLD');
+
+    // ---------------------------------------------------------------
+    // DATA INTEGRITY GATE
+    // marketData falls back to a synthetic random walk when the provider is
+    // unreachable, and previously labelled it source:'LIVE'. Trading on
+    // fabricated candles is strictly worse than not trading, so refuse.
+    // ---------------------------------------------------------------
+    const candleSource = m5History.source || 'UNKNOWN';
+    if (candleSource === 'SYNTHETIC' || candleSource === 'DEGRADED_LTP_ONLY') {
+      const msg = `[DATA INTEGRITY] Refusing to predict ${symbol}: candle source is ${candleSource}, not live market data.`;
+      console.warn(msg);
+      return {
+        signal: 'HOLD', confidence: 0, consensus: false, execute: false,
+        rejectionReason: `Non-live market data (${candleSource})`,
+        tradeQuality: 0, participating_models: {}, dataSource: candleSource
+      };
+    }
 
     // 2. Run core models in parallel for voting consensus
     const [pred1, pred4, pred5, pred11, newsHeadlines] = await Promise.all([
@@ -498,17 +540,28 @@ const predictor = {
     const pred9 = { signal: breadthSignal, confidence: breadthConfidence };
 
     const volumeStateData = volumeIntelligenceAgent.analyzeVolume(candles5M);
-    const pred10 = { signal: volumeStateData.volumeState === 'VOLUME_CLIMAX' || volumeStateData.volumeState === 'EXPANSION' ? 'BUY' : (volumeStateData.volumeState === 'DISTRIBUTION' ? 'SELL' : 'HOLD'), confidence: volumeStateData.volumeScore / 100 };
+    // volumeState encodes MAGNITUDE; volumeScore encodes DIRECTION (>50 bullish).
+    // Keying the vote on the state name emitted BUY on selling climaxes and on
+    // bearish expansions - 44 of its 51 stored BUY votes were bearish states
+    // scored 30/35 - while ACCUMULATION (75) and ABSORPTION (85) mapped to HOLD.
+    const vScore = volumeStateData.volumeScore;
+    const pred10 = {
+      signal: vScore >= 65 ? 'BUY' : (vScore <= 35 ? 'SELL' : 'HOLD'),
+      confidence: 0.5 + Math.abs(vScore - 50) / 100
+    };
 
+    // Agents 5, 7 and 9 are all derived from the SAME single macro fetch
+    // (pred5), over a 7-day window, with no symbol argument. They cast three
+    // separate votes off one weekly number that is identical for every symbol
+    // in a scan - a permanent ~38% BUY floor that made the BUY-side consensus
+    // veto structurally unable to fire. They remain in participating_models for
+    // observability, but they no longer vote on direction.
     const allSignals = {
       1: pred1,
       2: pred2,
       3: pred3,
       4: pred4,
-      5: pred5,
       6: pred6,
-      7: pred7,
-      9: pred9,
       10: pred10,
       11: pred11,
       12: pred12
@@ -533,7 +586,10 @@ const predictor = {
     // Get active session timing info
     let currentMins = 600; // default 10:00 AM IST
     try {
-      const timeInfo = db.getSystemTime ? db.getSystemTime() : { hours: new Date().getHours(), minutes: new Date().getMinutes() };
+      // db.getSystemTime() does not exist, so this always fell through to
+      // new Date().getHours() - server-local time, which is UTC in production.
+      // Every session/regime rule was therefore shifted by 5h30m.
+      const timeInfo = require('./lifecycleFSM').getSystemTime();
       currentMins = timeInfo.hours * 60 + timeInfo.minutes;
     } catch (e) {}
     const isHighLiquiditySession = (currentMins >= 555 && currentMins <= 615) || (currentMins >= 870 && currentMins <= 930);
@@ -610,14 +666,16 @@ const predictor = {
     const isBullishClose = lastCandle.close > lastCandle.open;
     const isBearishClose = lastCandle.close < lastCandle.open;
 
-    if (['Morning Star', 'Bullish Engulfing', 'Hammer', 'Marubozu'].includes(candlePattern) || 
+    if (['Morning Star', 'Bullish Engulfing', 'Hammer'].includes(candlePattern) ||
+        (candlePattern === 'Marubozu' && isBullishClose) || 
         (candlePattern === 'Pin Bar' && candleScoreDetails.reasoning.toLowerCase().includes('bullish')) ||
         (candlePattern === 'Outside Bar' && isBullishClose) ||
         (candlePattern === 'Inside Bar' && isBullishClose) ||
         (candlePattern === 'Doji' && isBullishClose && candleScore >= 50) ||
         (candlePattern === 'None' && candleCategory === 'Breakout' && isBullishClose)) {
       triggerSignal = 'BUY';
-    } else if (['Evening Star', 'Bearish Engulfing', 'Shooting Star', 'Marubozu'].includes(candlePattern) || 
+    } else if (['Evening Star', 'Bearish Engulfing', 'Shooting Star'].includes(candlePattern) ||
+               (candlePattern === 'Marubozu' && isBearishClose) || 
                (candlePattern === 'Pin Bar' && candleScoreDetails.reasoning.toLowerCase().includes('bearish')) ||
                (candlePattern === 'Outside Bar' && isBearishClose) ||
                (candlePattern === 'Inside Bar' && isBearishClose) ||
@@ -632,7 +690,9 @@ const predictor = {
     let activeWeightSum = 0;
     Object.keys(allSignals).forEach(id => {
       const p = allSignals[id];
-      if (!p.failed) activeWeightSum += weights[`agent${id}_weight`] || 0.1;
+      // `||` treats a deliberate 0.00 weight as 0.1, silently resurrecting an
+      // agent that was meant to be switched off. `??` only defaults on absence.
+      if (!p.failed) activeWeightSum += weights[`agent${id}_weight`] ?? 0.1;
     });
 
     let buyWeight = 0, sellWeight = 0;
@@ -643,7 +703,7 @@ const predictor = {
     Object.keys(allSignals).forEach(id => {
       const p = allSignals[id];
       if (p.failed) return;
-      const w = (weights[`agent${id}_weight`] || 0.1) / (activeWeightSum || 1);
+      const w = (weights[`agent${id}_weight`] ?? 0.1) / (activeWeightSum || 1);
       totalWeightedConfidence += p.confidence * w;
 
       if (p.signal === 'BUY') {
@@ -668,10 +728,30 @@ const predictor = {
     }
 
     // STRICT CONSENSUS GUARD: If multi-agent consensus strongly opposes the direction, veto primarySignal
-    if (primarySignal === 'BUY' && (sellWeight > buyWeight || buyWeight < 0.15)) {
+    // A veto must require a real margin. Measured on live data, RELIANCE was
+    // vetoed on buyW 0.440678 vs sellW 0.435028 - a 0.56pp gap the log rounds
+    // to "0.44 vs 0.44". That is noise being treated as strong opposition.
+    const CONSENSUS_MARGIN = 0.10;
+    if (primarySignal === 'BUY' && (sellWeight > buyWeight + CONSENSUS_MARGIN || buyWeight < 0.15)) {
       primarySignal = 'HOLD';
-    } else if (primarySignal === 'SELL' && (buyWeight > sellWeight || sellWeight < 0.15)) {
+    } else if (primarySignal === 'SELL' && (buyWeight > sellWeight + CONSENSUS_MARGIN || sellWeight < 0.15)) {
       primarySignal = 'HOLD';
+    }
+
+    // Signal-origin diagnostic. "Why is everything HOLD?" is the single most
+    // common question about this system, and the answer lives in these four
+    // values. Set SIGNAL_DEBUG=1 to print them per symbol.
+    if (process.env.SIGNAL_DEBUG) {
+      const guardFired = (primarySignal === 'HOLD') &&
+        ((alignedMTF === 'BUY' && triggerSignal === 'BUY') || (triggerSignal === 'BUY' && trendVotes.BUY >= 2));
+      console.log('[SIGNAL] ' + symbol.padEnd(12) +
+        ' pattern=' + String(candlePattern).padEnd(18) +
+        ' trigger=' + String(triggerSignal).padEnd(5) +
+        ' MTF=' + String(alignedMTF).padEnd(5) +
+        ' votes(B/S)=' + trendVotes.BUY + '/' + trendVotes.SELL +
+        ' buyW=' + buyWeight.toFixed(2) + ' sellW=' + sellWeight.toFixed(2) +
+        ' => ' + primarySignal +
+        (guardFired ? '   <-- vetoed by STRICT CONSENSUS GUARD' : ''));
     }
 
     let minConfidenceThresh = 0.55;
@@ -870,10 +950,28 @@ const predictor = {
     }
 
 
+    // Determine exact Institutional Strategy setup
+    let identifiedStrategy = 'MARKET_STRUCTURE_CONFLUENCE';
+    const orHigh = Math.max(...highsM5.slice(0, 3));
+    const orLow = Math.min(...lowsM5.slice(0, 3));
+    const isBullishORB = lastPrice > orHigh && lastPrice > vwapValue && (volumeStateData.rvol || 1.0) >= 1.25;
+    const isBearishORB = lastPrice < orLow && lastPrice < vwapValue && (volumeStateData.rvol || 1.0) >= 1.25;
+    const isVWAPPullback = Math.abs(distVWAP) <= 0.35 && (volumeStateData.rvol || 1.0) >= 1.15;
+    const isSMCSweep = pred12.liquidityScore > 65 || pred12.bosScore > 65;
+
+    if ((finalSignal === 'BUY' && isBullishORB) || (finalSignal === 'SELL' && isBearishORB)) {
+      identifiedStrategy = 'ORB_BREAKOUT';
+    } else if (isVWAPPullback) {
+      identifiedStrategy = 'VWAP_PULLBACK';
+    } else if (isSMCSweep) {
+      identifiedStrategy = 'SMC_LIQUIDITY_SWEEP';
+    }
+
     const finalPrediction = {
       stage: 1,
       consensus: decision.execute,
       signal: finalSignal,
+      strategy: identifiedStrategy,
       execute: decision.execute,
       rejectionReason: decision.rejections.join(', '),
       rejections: decision.rejections,
@@ -894,6 +992,9 @@ const predictor = {
       confidenceInterval: bayesianResult.confidenceInterval,
       stopLossPrice: stopsAndTargets.stopLoss,
       targetPrice: stopsAndTargets.target,
+      target1: stopsAndTargets.target1,
+      target2: stopsAndTargets.target2,
+      target3: stopsAndTargets.target3,
       calculatedRiskReward: stopsAndTargets.riskReward,
       confidence: finalConfidence,
       tradeQuality: finalTqs,
@@ -1337,6 +1438,21 @@ const predictor = {
 
   async adjustWeights(pnl) {
     console.log(`[PREDICTOR] adjustWeights compatibility hook called with PnL ₹${pnl}.`);
+    const portfolio = await db.getPortfolioState();
+    const currentWeights = (portfolio && portfolio.model_weights) ? { ...portfolio.model_weights } : {};
+    
+    const curA1 = currentWeights.agent1_weight !== undefined ? currentWeights.agent1_weight : 0.15;
+    const curCount = currentWeights.adaptationCount !== undefined ? currentWeights.adaptationCount : 0;
+    
+    if (pnl < 0) {
+      currentWeights.agent1_weight = Math.max(0.01, parseFloat((curA1 * 0.9).toFixed(4)));
+    } else {
+      currentWeights.agent1_weight = Math.min(0.50, parseFloat((curA1 * 1.05).toFixed(4)));
+    }
+    currentWeights.adaptationCount = curCount + 1;
+    
+    await db.updatePortfolioState({ model_weights: currentWeights });
+
     if (lastPredictionState) {
       await this.recordPredictionExit(lastPredictionState.symbol, lastPredictionState.entry_price || 0, pnl);
     } else {

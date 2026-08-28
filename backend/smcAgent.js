@@ -241,6 +241,10 @@ function predict(symbol, candles) {
 
   return {
     vote,
+    // The consensus loop in predictor.js reads `.signal`, not `.vote`. Without
+    // this alias agent12 was counted in activeWeightSum and diluted every other
+    // agent's share by ~7%, while being structurally unable to cast a vote.
+    signal: vote,
     confidence: parseFloat(Math.min(0.95, confidence).toFixed(2)),
     structureScore,
     bosScore,

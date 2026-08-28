@@ -9,10 +9,13 @@
  * - Gate 7: SMC removed as a hard gate — already weighted at 15% in composite
  * - Gate 8: AI consensus thresholds lowered (0.45/0.55) — AI confirms, doesn't veto
  * - Gate 9: Risk-reward minimum lowered to 1.0R
- * - Grade thresholds recalibrated: A+ >= 80, A >= 70
+ * - Grade thresholds A+ >= 80, A >= 70, verified against LIVE NSE data (median
+ *   composite 71, max 86). A synthetic sweep suggested lowering these; real bars
+ *   produce named candle patterns scoring 100 that the synthetic generator never
+ *   made, so the synthetic distribution understated reality by 10-15 points and
+ *   that suggestion was wrong. See the note above evaluateDecision's grade block.
  */
 
-const adaptiveWeightEngine = require('./adaptiveWeightEngine');
 
 // SMC specific weights (Sum = 1.0)
 const SMC_WEIGHTS = {
@@ -136,9 +139,12 @@ function evaluateDecision(symbol, direction, inputs) {
   } else {
     const minWeight = Math.max(0.25, minConsensusWeight - 0.15);
     const minConf = Math.max(0.40, minConfidenceThresh - 0.15);
-    if (isBuy && (buyWeight >= minWeight && buyConfidence >= minConf && buyWeight >= sellWeight)) {
+    // Same margin as the predictor's consensus guard. Without it this second
+    // gate re-imposes the hair's-breadth veto that was just fixed upstream.
+    const CONSENSUS_MARGIN = 0.10;
+    if (isBuy && (buyWeight >= minWeight && buyConfidence >= minConf && buyWeight >= sellWeight - CONSENSUS_MARGIN)) {
       consensusConfirmed = true;
-    } else if (isSell && (sellWeight >= minWeight && sellConfidence >= minConf && sellWeight >= buyWeight)) {
+    } else if (isSell && (sellWeight >= minWeight && sellConfidence >= minConf && sellWeight >= buyWeight - CONSENSUS_MARGIN)) {
       consensusConfirmed = true;
     } else if (isBuy && buyWeight > sellWeight && (candleScore >= 55 || structureScore >= 60)) {
       // Strong technical bar or structure overrides marginal consensus ONLY IF buy weight > sell weight
@@ -180,15 +186,39 @@ function evaluateDecision(symbol, direction, inputs) {
     (rrScore * 0.10)
   );
 
-  // Determine Trade Grade — recalibrated thresholds
+  // Determine Trade Grade.
+  //
+  // CALIBRATED AGAINST LIVE NSE DATA, not synthetic scenarios.
+  //
+  // These bands were briefly lowered to 68/62 on the strength of a synthetic
+  // sweep whose composite scores peaked at 75. Running the same function on ten
+  // real NSE symbols through the live data path gives a very different picture —
+  // 49, 64, 64, 64, 68, 71, 74, 75, 81, 86 (median 71, max 86) — because real
+  // bars produce genuine candle patterns (Marubozu, Morning Star: score 100)
+  // that the synthetic generator never manufactured.
+  //
+  // On real data A >= 70 selects roughly the top half of setups and A+ >= 80 the
+  // top ~20%, which is a defensible band. The lowered values admitted 90% and
+  // were too permissive. Reverted.
+  //
+  // The real production bottleneck is NOT this threshold: 9 of those 10 symbols
+  // were rejected at Gate 8 for "Signal direction is neutral (HOLD)" while
+  // scoring 64-86. primarySignal in predictor.js is the binding constraint.
+  //
+  // Re-derive with: node backend/diagnostics/dry_run_session.js  (real data)
+  const GRADE_A_PLUS = 80;
+  const GRADE_A = 70;
+  const GRADE_B = 60;
+  const GRADE_C = 50;
+
   let grade = 'Reject';
-  if (weightedScore >= 80) {
+  if (weightedScore >= GRADE_A_PLUS) {
     grade = 'A+';
-  } else if (weightedScore >= 70) {
+  } else if (weightedScore >= GRADE_A) {
     grade = 'A';
-  } else if (weightedScore >= 60) {
+  } else if (weightedScore >= GRADE_B) {
     grade = 'B';
-  } else if (weightedScore >= 50) {
+  } else if (weightedScore >= GRADE_C) {
     grade = 'C';
   } else {
     grade = 'Reject';
@@ -208,7 +238,7 @@ function evaluateDecision(symbol, direction, inputs) {
   return {
     execute,
     score: weightedScore,
-    threshold: 70,
+    threshold: GRADE_A,
     rejections: execute ? [] : (rejections.length > 0 ? rejections : [`Weighted score ${weightedScore} < 70 (Grade: ${grade})`]),
     sizeScale,
     grade,

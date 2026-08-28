@@ -88,7 +88,7 @@ const agentResearch = {
             milestoneChanged = true;
           }
           
-          if (elapsedMin >= 240 || new Date().getHours() >= 15) {
+          if (elapsedMin >= 240 || require('./lifecycleFSM').getSystemTime().hours >= 15) {
             audit.ref_eod = currentPrice;
             audit.completed = true;
             milestoneChanged = true;
@@ -128,7 +128,7 @@ const agentResearch = {
             milestoneChanged = true;
           }
           
-          if (elapsedMin >= 240 || new Date().getHours() >= 15) {
+          if (elapsedMin >= 240 || require('./lifecycleFSM').getSystemTime().hours >= 15) {
             opp.ref_eod = currentPrice;
             opp.completed = true;
             milestoneChanged = true;
